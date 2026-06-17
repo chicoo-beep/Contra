@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<meta name="theme-color" content="#000000" />
+<meta name="theme-color" content="#7ec0ee" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <title>CONTRA — Jungle Run</title>
@@ -13,7 +13,7 @@
   html, body {
     width: 100%; height: 100%; overflow: hidden;
     background: #000; color: #fff;
-    font-family: "Courier New", monospace;
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
     touch-action: none; user-select: none; -webkit-user-select: none;
     overscroll-behavior: none;
   }
@@ -23,54 +23,55 @@
   }
   canvas {
     image-rendering: pixelated; image-rendering: crisp-edges;
-    background: #1a2a3a; touch-action: none; display: block;
+    background: #8ed0ef; display: block;
   }
 
-  /* ---- Touch controls ---- */
-  #touch-ui {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: none;
+  /* ---------- Touch controls ---------- */
+  #touch-ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; display: none; }
+  .touch .ctl { display: block !important; }
+  .ctl { display: none; }
+  .ctlbtn {
+    pointer-events: auto; position: absolute;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: bold; user-select: none;
+    background: rgba(20,28,40,0.32);
+    border: 3px solid rgba(255,255,255,0.45);
+    box-shadow: inset 0 0 12px rgba(255,255,255,0.15);
+    backdrop-filter: blur(1px);
   }
-  .touch .ctl { display: flex !important; }
-  .ctl { pointer-events: auto; position: absolute; display: none; }
+  .ctlbtn.active { background: rgba(255,210,0,0.55); border-color: #ffd200; transform: scale(0.93); }
 
-  #dpad {
-    left: 18px; bottom: calc(22px + var(--pad));
-    width: 216px; height: 216px;
-    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
-    gap: 5px;
-  }
-  .dbtn {
-    background: rgba(255,255,255,0.12); border: 2px solid rgba(255,255,255,0.32);
-    border-radius: 12px; display: flex; align-items: center; justify-content: center;
-    font-size: 30px; color: rgba(255,255,255,0.8); font-weight: bold;
-  }
-  .dbtn.active { background: rgba(255,210,0,0.45); border-color: #ffd200; }
-  #d-up    { grid-area: 1 / 2; }
-  #d-left  { grid-area: 2 / 1; }
-  #d-right { grid-area: 2 / 3; }
-  #d-down  { grid-area: 3 / 2; }
-  .dcenter { grid-area: 2 / 2; background: rgba(255,255,255,0.04); border: none; }
+  /* left: move arrows */
+  #left-cluster { position: absolute; left: 16px; bottom: calc(20px + var(--pad)); }
+  .move { width: 84px; height: 84px; border-radius: 18px; font-size: 38px; }
+  #b-left  { left: 0; }
+  #b-right { left: 96px; }
+  #left-cluster .move { bottom: 0; }
 
-  #act-buttons {
-    right: 22px; bottom: calc(26px + var(--pad));
-    width: 240px; height: 200px;
-  }
-  .abtn {
-    position: absolute; width: 100px; height: 100px; border-radius: 50%;
-    border: 3px solid rgba(255,255,255,0.38); font-weight: bold;
-    font-size: 17px; color: #fff; letter-spacing: 1px;
-    display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.05;
-  }
-  #btn-jump { right: 112px; bottom: 0;  background: rgba(60,160,255,0.38); }
-  #btn-fire { right: 0;   bottom: 64px; background: rgba(255,70,70,0.44); }
-  .abtn.active { filter: brightness(1.6); transform: scale(0.94); }
+  /* right: diamond of action buttons */
+  #right-cluster { position: absolute; right: 18px; bottom: calc(18px + var(--pad)); width: 210px; height: 210px; }
+  .act { width: 76px; height: 76px; border-radius: 50%; font-size: 26px; }
+  #b-up   { right: 67px; bottom: 130px; background: rgba(60,160,255,0.40); } /* aim up */
+  #b-down { right: 67px; bottom: 4px;   background: rgba(60,160,255,0.40); } /* aim down */
+  #b-fire { right: 134px; bottom: 67px; background: rgba(255,70,70,0.50);  } /* FIRE */
+  #b-jump { right: 0;    bottom: 67px;  background: rgba(80,220,120,0.48); } /* JUMP */
+  .act small { font-size: 11px; letter-spacing: 1px; }
 
-  /* ---- Overlays ---- */
+  /* pause button */
+  #pause-btn {
+    pointer-events: auto; position: absolute; top: 10px; right: 10px;
+    width: 44px; height: 44px; border-radius: 10px;
+    background: rgba(20,28,40,0.45); border: 2px solid rgba(255,255,255,0.5);
+    display: none; align-items: center; justify-content: center; color: #fff; font-size: 18px;
+    z-index: 12;
+  }
+  .touch #pause-btn, .show-pause #pause-btn { display: flex; }
+
+  /* ---------- Overlays ---------- */
   .overlay {
     position: absolute; inset: 0; z-index: 20;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.82); text-align: center; padding: 20px;
+    background: rgba(10,16,28,0.82); text-align: center; padding: 20px;
   }
   .hidden { display: none !important; }
   .title {
@@ -78,58 +79,47 @@
     color: #ffd200; text-shadow: 3px 3px 0 #c0392b, 6px 6px 0 #7b241c;
     margin-bottom: 6px;
   }
-  .subtitle { font-size: clamp(13px, 4vw, 18px); color: #9fd3ff; margin-bottom: 26px; letter-spacing: 2px; }
+  .subtitle { font-size: clamp(13px, 4vw, 18px); color: #cfeaff; margin-bottom: 26px; letter-spacing: 2px; }
   .btn {
-    pointer-events: auto; background: #c0392b; color: #fff; border: 3px solid #fff;
-    font-family: inherit; font-weight: bold; font-size: clamp(16px, 5vw, 22px);
-    padding: 14px 34px; border-radius: 8px; cursor: pointer; letter-spacing: 2px;
-    text-transform: uppercase;
+    pointer-events: auto; background: #2ecc71; color: #08311c; border: 3px solid #fff;
+    font-family: inherit; font-weight: 900; font-size: clamp(16px, 5vw, 22px);
+    padding: 14px 38px; border-radius: 12px; cursor: pointer; letter-spacing: 2px;
+    text-transform: uppercase; box-shadow: 0 5px 0 #1e8a4c;
   }
-  .btn:active { transform: scale(0.96); background: #e74c3c; }
-  .help {
-    margin-top: 26px; font-size: clamp(11px, 3.4vw, 14px); color: #bbb;
-    line-height: 1.7; max-width: 460px;
-  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #1e8a4c; }
+  .help { margin-top: 26px; font-size: clamp(11px, 3.4vw, 14px); color: #cdd6e2; line-height: 1.7; max-width: 480px; }
   .help b { color: #ffd200; }
   #win-title { color: #5fe07a; text-shadow: 3px 3px 0 #1e7d34; }
   #over-title { color: #e74c3c; text-shadow: 3px 3px 0 #5b1a13; }
 
-  /* Rotate-to-landscape prompt (shown only on portrait touch devices) */
+  /* rotate prompt */
   #rotate-screen {
     position: fixed; inset: 0; z-index: 50; background: #06080c;
     display: none; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; padding: 24px;
   }
   #rotate-screen.show { display: flex; }
-  .phone-rot {
-    width: 64px; height: 110px; border: 5px solid #ffd200; border-radius: 12px;
-    margin-bottom: 26px; animation: tilt 1.6s ease-in-out infinite;
-  }
-  @keyframes tilt {
-    0%, 100% { transform: rotate(0deg); }
-    50% { transform: rotate(-90deg); }
-  }
+  .phone-rot { width: 64px; height: 110px; border: 5px solid #ffd200; border-radius: 12px; margin-bottom: 26px; animation: tilt 1.6s ease-in-out infinite; }
+  @keyframes tilt { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-90deg); } }
   #rotate-screen .rt { color: #ffd200; font-size: 22px; font-weight: 900; letter-spacing: 2px; }
   #rotate-screen .rs { color: #9fd3ff; font-size: 14px; margin-top: 10px; }
 </style>
 </head>
 <body>
-  <div id="game-wrap">
-    <canvas id="screen" width="480" height="270"></canvas>
-  </div>
+  <div id="game-wrap"><canvas id="screen" width="480" height="270"></canvas></div>
 
   <div id="touch-ui">
-    <div id="dpad" class="ctl">
-      <div class="dbtn" id="d-up" data-dir="up">▲</div>
-      <div class="dbtn" id="d-left" data-dir="left">◀</div>
-      <div class="dcenter"></div>
-      <div class="dbtn" id="d-right" data-dir="right">▶</div>
-      <div class="dbtn" id="d-down" data-dir="down">▼</div>
+    <div id="left-cluster" class="ctl">
+      <div class="ctlbtn move" id="b-left"  data-key="left">◀</div>
+      <div class="ctlbtn move" id="b-right" data-key="right">▶</div>
     </div>
-    <div id="act-buttons" class="ctl">
-      <div class="abtn" id="btn-jump" data-act="jump">JUMP</div>
-      <div class="abtn" id="btn-fire" data-act="fire">FIRE</div>
+    <div id="right-cluster" class="ctl">
+      <div class="ctlbtn act" id="b-up"   data-key="up">▲</div>
+      <div class="ctlbtn act" id="b-fire" data-key="fire"><small>FIRE</small></div>
+      <div class="ctlbtn act" id="b-jump" data-key="jump"><small>JUMP</small></div>
+      <div class="ctlbtn act" id="b-down" data-key="down">▼</div>
     </div>
+    <div id="pause-btn">❚❚</div>
   </div>
 
   <div id="start-screen" class="overlay">
@@ -137,9 +127,10 @@
     <div class="subtitle">JUNGLE RUN</div>
     <button class="btn" id="start-btn">▶ Start</button>
     <div class="help">
-      <b>Touch:</b> D-pad to move &amp; aim · JUMP · FIRE<br>
-      <b>Keyboard:</b> <b>←→</b> move · <b>↑↓</b> aim · <b>Z</b> jump · <b>X</b> fire<br>
-      Grab the <b>S</b> pod for the spread gun. Reach &amp; destroy the boss!
+      <b>Turn your phone sideways.</b><br>
+      <b>◀ ▶</b> move · <b>▲ ▼</b> aim up/down · <b>JUMP</b> · <b>FIRE</b><br>
+      <b>Keyboard:</b> ←→ move · ↑↓ aim · Z jump · X fire · P pause<br>
+      Grab <b>coins</b> &amp; the <b>S</b> pod (spread gun). Beat the boss!
     </div>
   </div>
 

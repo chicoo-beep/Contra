@@ -47,16 +47,19 @@ diagonally down.
 
 ## 🕹 What's in this build (playable vertical slice)
 
-- One side-scrolling jungle level (~4200px) with a parallax background.
+- A bright cartoon jungle/village level (~4600px): sky with sun & clouds, parallax
+  pink & green rolling hills, houses and trees, grassy cobble ground.
 - 8-direction shooting, running, jumping, and prone.
-- Running soldiers and stationary turrets.
-- The **`S`** power-up pod → spread gun (5-way fire); kept on respawn.
-- A boss with a health bar at the end of the level.
-- **10 lives**, a buffed hero (faster movement, higher jump, rapid hard-hitting
-  fire, longer mercy invulnerability), score, and game-over / level-clear screens.
-- **Sound effects** (synthesized in-browser — shooting, jumps, explosions,
-  power-ups, hits, boss death). Audio starts when you tap **Start**.
-- Big on-screen touch controls, sized for landscape play.
+- **Five enemy types:** marching soldiers, fixed turrets, fast charging **dogs**,
+  hovering **drones** that strafe you, and a **boss** with a health bar.
+- **Coins** to collect (with a coin counter) and the **`S`** spread-gun pod
+  (kept on respawn).
+- Polished HUD: character **portrait**, green **health bar**, coin count, score,
+  and a **pause** button (or press **P**).
+- **10 lives**, a buffed hero (faster, higher jump, rapid hard-hitting fire,
+  4-hit health per life, mercy invulnerability).
+- **Sound effects** synthesized in-browser; audio starts on the **Start** tap.
+- Big rounded landscape touch controls; portrait shows a "rotate" prompt.
 
 ## 🗺 Roadmap (possible next steps)
 
