@@ -45,17 +45,20 @@ diagonally down.
 > **Play in landscape** — turn your phone sideways. On portrait the game shows a
 > "rotate your phone" prompt and pauses, so the controls have room to breathe.
 
-## 🕹 What's in this build (playable vertical slice)
+## 🕹 What's in this build
 
-- A bright cartoon jungle/village level (~4600px): sky with sun & clouds, parallax
-  pink & green rolling hills, houses and trees, grassy cobble ground.
+- **Two levels** with distinct themes — *Level 1: Jungle Village* (bright day) and
+  *Level 2: Sunset Ruins* (dusk palette, tougher & faster enemies). Beat the
+  first boss to advance; clear the second boss to win. Your score, lives, coins
+  and weapon carry over.
+- **Original looping background music** (a synthesized chiptune track per level —
+  no copyrighted audio). Toggle with **M**.
 - 8-direction shooting, running, jumping, and prone.
-- **Five enemy types:** marching soldiers, fixed turrets, fast charging **dogs**,
-  hovering **drones** that strafe you, and a **boss** with a health bar.
-- **Coins** to collect (with a coin counter) and the **`S`** spread-gun pod
-  (kept on respawn).
-- Polished HUD: character **portrait**, green **health bar**, coin count, score,
-  and a **pause** button (or press **P**).
+- **Enemy types:** marching soldiers, fixed turrets, hovering **drones** that
+  strafe you, and a **boss** with a health bar on each level.
+- **Coins** to collect (with a counter) and the **`S`** spread-gun pod.
+- Polished HUD: character **portrait**, green **health bar**, coin count, level
+  & score, plus a **pause** button (or press **P**).
 - **10 lives**, a buffed hero (faster, higher jump, rapid hard-hitting fire,
   4-hit health per life, mercy invulnerability).
 - **Sound effects** synthesized in-browser; audio starts on the **Start** tap.
