@@ -23,14 +23,28 @@
     canvas.style.width = Math.floor(VW * scale) + "px";
     canvas.style.height = Math.floor(VH * scale) + "px";
   }
-  window.addEventListener("resize", resize);
-  window.addEventListener("orientationchange", () => setTimeout(resize, 150));
-  resize();
-
   // ---- Detect touch device to show on-screen controls ----
   const isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
   const touchUI = document.getElementById("touch-ui");
   if (isTouch) { touchUI.style.display = "block"; document.body.classList.add("touch"); }
+
+  // ---- Encourage landscape on phones: show a rotate prompt in portrait ----
+  const rotateScreen = document.getElementById("rotate-screen");
+  let portraitBlocked = false;
+  function checkOrientation() {
+    const portrait = window.innerHeight > window.innerWidth;
+    portraitBlocked = isTouch && portrait;
+    rotateScreen.classList.toggle("show", portraitBlocked);
+    // try to lock to landscape where the browser allows it
+    if (!portrait && screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock("landscape").catch(() => {});
+    }
+  }
+
+  window.addEventListener("resize", () => { resize(); checkOrientation(); });
+  window.addEventListener("orientationchange", () => setTimeout(() => { resize(); checkOrientation(); }, 150));
+  resize();
+  checkOrientation();
 
   // ============================================================
   //  Input
@@ -77,6 +91,62 @@
   const fireBtn = document.getElementById("btn-fire");
   bindHold(jumpBtn, () => { if (!input.jump) input.jumpPressed = true; input.jump = true; }, () => (input.jump = false));
   bindHold(fireBtn, () => (input.fire = true), () => (input.fire = false));
+
+  // ============================================================
+  //  Sound — synthesized with Web Audio (no asset files)
+  // ============================================================
+  let actx = null, masterGain = null, soundOn = true;
+  function initAudio() {
+    if (actx) { if (actx.state === "suspended") actx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { soundOn = false; return; }
+    actx = new AC();
+    masterGain = actx.createGain();
+    masterGain.gain.value = 0.5;
+    masterGain.connect(actx.destination);
+  }
+  // short tonal blip
+  function tone(freq, dur, type, vol, slideTo) {
+    if (!soundOn || !actx) return;
+    const t = actx.currentTime;
+    const o = actx.createOscillator();
+    const g = actx.createGain();
+    o.type = type || "square";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t + dur);
+    g.gain.setValueAtTime(vol == null ? 0.25 : vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(masterGain);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  // noise burst (explosions / hits)
+  function noise(dur, vol, filterFreq) {
+    if (!soundOn || !actx) return;
+    const t = actx.currentTime;
+    const n = Math.floor(actx.sampleRate * dur);
+    const buf = actx.createBuffer(1, n, actx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = actx.createBufferSource(); src.buffer = buf;
+    const f = actx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = filterFreq || 1200;
+    const g = actx.createGain(); g.gain.value = vol == null ? 0.4 : vol;
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(masterGain);
+    src.start(t); src.stop(t + dur);
+  }
+  const SFX = {
+    shoot:   () => tone(820, 0.07, "square", 0.16, 360),
+    spread:  () => { tone(700, 0.08, "sawtooth", 0.14, 320); tone(520, 0.08, "square", 0.10, 240); },
+    jump:    () => tone(320, 0.16, "square", 0.20, 680),
+    hit:     () => noise(0.08, 0.25, 2200),
+    explode: () => { noise(0.35, 0.5, 900); tone(160, 0.3, "sawtooth", 0.2, 50); },
+    power:   () => { tone(523, 0.09, "square", 0.22); setTimeout(() => tone(784, 0.12, "square", 0.22), 90); setTimeout(() => tone(1046, 0.14, "square", 0.22), 200); },
+    hurt:    () => { tone(220, 0.3, "sawtooth", 0.3, 70); noise(0.2, 0.3, 700); },
+    bossHit: () => tone(120, 0.06, "square", 0.18, 90),
+    bossDie: () => { noise(0.8, 0.6, 700); tone(90, 0.7, "sawtooth", 0.35, 40); },
+    over:    () => { tone(330, 0.25, "square", 0.25, 220); setTimeout(() => tone(247, 0.25, "square", 0.25, 160), 220); setTimeout(() => tone(165, 0.5, "square", 0.25, 90), 460); },
+    win:     () => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.18, "square", 0.25), i * 130)); }
+  };
 
   // ============================================================
   //  Game state
@@ -158,7 +228,7 @@
     platforms = buildPlatforms();
     enemies = buildEnemies();
     boss = makeBoss();
-    camX = 0; score = 0; lives = 3;
+    camX = 0; score = 0; lives = 10;
     shootCD = 0; flashT = 0; frame = 0;
   }
 
@@ -182,12 +252,15 @@
     if (player.weapon === "spread") {
       for (let a = -2; a <= 2; a++) {
         const ang = Math.atan2(ny, nx) + a * 0.16;
-        bullets.push({ x: muzzleX, y: muzzleY, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, r: 3, spread: true });
+        bullets.push({ x: muzzleX, y: muzzleY, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, r: 3, spread: true, dmg: 2 });
       }
+      SFX.spread();
     } else {
-      bullets.push({ x: muzzleX, y: muzzleY, vx: nx, vy: ny, r: 2, spread: false });
+      // buffed rifle: bigger, harder-hitting bullets
+      bullets.push({ x: muzzleX, y: muzzleY, vx: nx, vy: ny, r: 3, spread: false, dmg: 2 });
+      SFX.shoot();
     }
-    shootCD = player.weapon === "spread" ? 9 : 7;
+    shootCD = player.weapon === "spread" ? 6 : 4;
   }
 
   function enemyShoot(ex, ey, tx, ty, speed) {
@@ -206,15 +279,19 @@
     if (player.invuln > 0) return;
     lives--;
     flashT = 8;
+    SFX.hurt();
     burst(player.x + 7, player.y + 15, "#ff5050", 22);
     if (lives <= 0) {
       gameState = "over";
+      SFX.over();
       showOverlay("gameover-screen", "over-score", "SCORE " + score);
     } else {
-      // respawn near current camera position
+      // respawn near current camera position, with longer mercy invulnerability
+      const keepWeapon = player.weapon;
       player = makePlayer();
+      player.weapon = keepWeapon;   // keep your spread gun when you respawn
       player.x = camX + 40;
-      player.invuln = 110;
+      player.invuln = 150;
     }
   }
 
@@ -223,22 +300,23 @@
   // ============================================================
   function update() {
     frame++;
+    if (portraitBlocked) return;          // paused while phone is held upright
     if (gameState !== "playing") return;
     if (flashT > 0) flashT--;
 
     const p = player;
     if (p.invuln > 0) p.invuln--;
 
-    // --- Horizontal movement ---
-    const ACC = 0.8, MAXV = 2.6, FRICT = 0.75;
+    // --- Horizontal movement (buffed: faster & snappier) ---
+    const ACC = 1.0, MAXV = 3.6, FRICT = 0.78;
     p.prone = input.down && p.onGround && !(input.left || input.right);
     if (input.left) { p.vx -= ACC; p.facing = -1; }
     if (input.right) { p.vx += ACC; p.facing = 1; }
     if (!input.left && !input.right) p.vx *= FRICT;
     p.vx = Math.max(-MAXV, Math.min(MAXV, p.vx));
 
-    // --- Jump ---
-    if (input.jumpPressed && p.onGround) { p.vy = -8.6; p.onGround = false; }
+    // --- Jump (buffed: higher) ---
+    if (input.jumpPressed && p.onGround) { p.vy = -9.6; p.onGround = false; SFX.jump(); }
     input.jumpPressed = false;
     // drop through? (down + jump on a platform) — keep simple: no drop-through
 
@@ -287,26 +365,27 @@
       }
       let hit = false;
       const bb = rect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
+      const dmg = b.dmg || 1;
       for (const e of enemies) {
         if (!e.alive) continue;
         if (overlap(bb, e)) {
-          e.hp--; hit = true;
+          e.hp -= dmg; hit = true;
           burst(b.x, b.y, "#ffd23f", 5);
-          if (e.hp <= 0) { e.alive = false; score += e.type === "turret" ? 300 : 100; burst(e.x + e.w / 2, e.y + e.h / 2, "#ff8c3f", 16); }
+          if (e.hp <= 0) { e.alive = false; score += e.type === "turret" ? 300 : 100; burst(e.x + e.w / 2, e.y + e.h / 2, "#ff8c3f", 16); SFX.explode(); }
+          else SFX.hit();
           break;
         }
       }
       // boss hit
       if (!hit && boss.alive && boss.active && overlap(bb, boss)) {
-        boss.hp--; hit = true; boss.pulse = 6;
+        boss.hp -= dmg; hit = true; boss.pulse = 6;
         burst(b.x, b.y, "#ffef7a", 6);
-        score += 5;
+        score += 5; SFX.bossHit();
         if (boss.hp <= 0) {
           boss.alive = false;
-          for (let k = 0; k < 6; k++) setTimeout(() => {}, 0);
           burst(boss.x + boss.w / 2, boss.y + boss.h / 2, "#ff5a3c", 60);
           score += 2000;
-          gameState = "win";
+          gameState = "win"; SFX.bossDie(); SFX.win();
           showOverlay("win-screen", "win-score", "SCORE " + score);
         }
       }
@@ -381,6 +460,7 @@
         pk.taken = true;
         player.weapon = "spread";
         score += 50;
+        SFX.power();
         burst(pk.x + 8, pk.y + 8, "#3fd0ff", 18);
       }
     }
@@ -593,18 +673,15 @@
     ctx.textAlign = "left"; ctx.textBaseline = "top";
     ctx.fillStyle = "rgba(0,0,0,0.35)";
     ctx.fillRect(0, 0, VW, 18);
-    // lives
+    // lives — one soldier icon + a count (so 10+ fits cleanly)
+    ctx.fillStyle = "#3b6fd4"; ctx.fillRect(8, 4, 6, 10);
+    ctx.fillStyle = "#c0392b"; ctx.fillRect(8, 3, 6, 2);
     ctx.fillStyle = "#ffd23f";
     ctx.font = "bold 11px monospace";
-    ctx.fillText("LIVES", 6, 4);
-    for (let i = 0; i < lives; i++) {
-      const lx = 44 + i * 12;
-      ctx.fillStyle = "#3b6fd4"; ctx.fillRect(lx, 4, 6, 10);
-      ctx.fillStyle = "#c0392b"; ctx.fillRect(lx, 3, 6, 2);
-    }
+    ctx.fillText("x" + lives, 18, 4);
     // weapon
     ctx.fillStyle = "#9fd3ff";
-    ctx.fillText("GUN:" + (player.weapon === "spread" ? "SPREAD" : "RIFLE"), 110, 4);
+    ctx.fillText("GUN:" + (player.weapon === "spread" ? "SPREAD" : "RIFLE"), 64, 4);
     // score
     ctx.fillStyle = "#fff";
     ctx.textAlign = "right";
@@ -637,6 +714,7 @@
   function hideOverlay(id) { document.getElementById(id).classList.add("hidden"); }
 
   function startGame() {
+    initAudio();           // unlock audio on a user tap (required by browsers)
     resetGame();
     gameState = "playing";
     hideOverlay("start-screen");

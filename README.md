@@ -42,14 +42,21 @@ Or just open `index.html` directly in a browser.
 Hold a direction + ▲ to fire diagonally upward; in mid-air, direction + ▼ fires
 diagonally down.
 
+> **Play in landscape** — turn your phone sideways. On portrait the game shows a
+> "rotate your phone" prompt and pauses, so the controls have room to breathe.
+
 ## 🕹 What's in this build (playable vertical slice)
 
 - One side-scrolling jungle level (~4200px) with a parallax background.
 - 8-direction shooting, running, jumping, and prone.
 - Running soldiers and stationary turrets.
-- The **`S`** power-up pod → spread gun (5-way fire).
+- The **`S`** power-up pod → spread gun (5-way fire); kept on respawn.
 - A boss with a health bar at the end of the level.
-- 3 lives, score, hit feedback, game-over / level-clear screens.
+- **10 lives**, a buffed hero (faster movement, higher jump, rapid hard-hitting
+  fire, longer mercy invulnerability), score, and game-over / level-clear screens.
+- **Sound effects** (synthesized in-browser — shooting, jumps, explosions,
+  power-ups, hits, boss death). Audio starts when you tap **Start**.
+- Big on-screen touch controls, sized for landscape play.
 
 ## 🗺 Roadmap (possible next steps)
 

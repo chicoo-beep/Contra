@@ -35,15 +35,15 @@
   .ctl { pointer-events: auto; position: absolute; display: none; }
 
   #dpad {
-    left: 14px; bottom: calc(20px + var(--pad));
-    width: 168px; height: 168px;
+    left: 18px; bottom: calc(22px + var(--pad));
+    width: 216px; height: 216px;
     display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
-    gap: 4px;
+    gap: 5px;
   }
   .dbtn {
-    background: rgba(255,255,255,0.10); border: 2px solid rgba(255,255,255,0.30);
-    border-radius: 10px; display: flex; align-items: center; justify-content: center;
-    font-size: 22px; color: rgba(255,255,255,0.7); font-weight: bold;
+    background: rgba(255,255,255,0.12); border: 2px solid rgba(255,255,255,0.32);
+    border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    font-size: 30px; color: rgba(255,255,255,0.8); font-weight: bold;
   }
   .dbtn.active { background: rgba(255,210,0,0.45); border-color: #ffd200; }
   #d-up    { grid-area: 1 / 2; }
@@ -53,17 +53,17 @@
   .dcenter { grid-area: 2 / 2; background: rgba(255,255,255,0.04); border: none; }
 
   #act-buttons {
-    right: 18px; bottom: calc(24px + var(--pad));
-    width: 200px; height: 168px;
+    right: 22px; bottom: calc(26px + var(--pad));
+    width: 240px; height: 200px;
   }
   .abtn {
-    position: absolute; width: 84px; height: 84px; border-radius: 50%;
-    border: 3px solid rgba(255,255,255,0.35); font-weight: bold;
-    font-size: 15px; color: #fff; letter-spacing: 1px;
+    position: absolute; width: 100px; height: 100px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.38); font-weight: bold;
+    font-size: 17px; color: #fff; letter-spacing: 1px;
     display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.05;
   }
-  #btn-jump { right: 96px; bottom: 0;  background: rgba(60,160,255,0.35); }
-  #btn-fire { right: 0;   bottom: 56px; background: rgba(255,70,70,0.40); }
+  #btn-jump { right: 112px; bottom: 0;  background: rgba(60,160,255,0.38); }
+  #btn-fire { right: 0;   bottom: 64px; background: rgba(255,70,70,0.44); }
   .abtn.active { filter: brightness(1.6); transform: scale(0.94); }
 
   /* ---- Overlays ---- */
@@ -93,6 +93,24 @@
   .help b { color: #ffd200; }
   #win-title { color: #5fe07a; text-shadow: 3px 3px 0 #1e7d34; }
   #over-title { color: #e74c3c; text-shadow: 3px 3px 0 #5b1a13; }
+
+  /* Rotate-to-landscape prompt (shown only on portrait touch devices) */
+  #rotate-screen {
+    position: fixed; inset: 0; z-index: 50; background: #06080c;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 24px;
+  }
+  #rotate-screen.show { display: flex; }
+  .phone-rot {
+    width: 64px; height: 110px; border: 5px solid #ffd200; border-radius: 12px;
+    margin-bottom: 26px; animation: tilt 1.6s ease-in-out infinite;
+  }
+  @keyframes tilt {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(-90deg); }
+  }
+  #rotate-screen .rt { color: #ffd200; font-size: 22px; font-weight: 900; letter-spacing: 2px; }
+  #rotate-screen .rs { color: #9fd3ff; font-size: 14px; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -135,6 +153,12 @@
     <div class="title" id="win-title">CLEARED!</div>
     <div class="subtitle" id="win-score">SCORE 0</div>
     <button class="btn" id="again-btn">↻ Play Again</button>
+  </div>
+
+  <div id="rotate-screen">
+    <div class="phone-rot"></div>
+    <div class="rt">↻ ROTATE YOUR PHONE</div>
+    <div class="rs">Turn sideways (landscape) to play</div>
   </div>
 
   <script src="game.js"></script>
