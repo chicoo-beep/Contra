@@ -56,7 +56,10 @@ diagonally down.
 - 8-direction shooting, running, jumping, and prone.
 - **Four weapons** via colored pickup pods: **RIFLE** (default), **`S`** spread,
   **`F`** flamethrower (rapid short-range stream), **`R`** rocket launcher
-  (slow, explosive splash damage that clears crowds).
+  (slow, explosive splash damage that clears crowds). No ammo limits.
+- **Weapon-switch button** (centre **⟳ WPN**, or key **Q**) cycles through every
+  weapon you've collected.
+- **God Mode** toggle (top-right **GOD** button, or key **G**) for invincibility.
 - **Enemy types:** marching soldiers, tanky **heavies** (5 HP, twin-shot),
   leaping **jumpers**, fixed turrets, hovering **drones**, and a **boss** with a
   health bar on each level — lots of them on screen for a chaotic, road-rage feel.

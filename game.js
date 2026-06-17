@@ -50,6 +50,8 @@
   window.addEventListener("keydown", (e) => {
     if (e.code === "KeyP") { togglePause(); return; }
     if (e.code === "KeyM") { toggleMusic(); return; }
+    if (e.code === "KeyG") { toggleGod(); return; }
+    if (e.code === "KeyQ") { switchWeapon(); return; }
     const a = keyMap[e.code]; if (!a) return; e.preventDefault();
     if (a === "jump" && !input.jump) input.jumpPressed = true;
     input[a] = true;
@@ -69,6 +71,15 @@
     const k = el.dataset.key;
     bindHold(el, () => { if (k === "jump" && !input.jump) input.jumpPressed = true; if (k === "fire") initAudio(); input[k] = true; }, () => { input[k] = false; });
   });
+  // tap-style buttons (fire once per press, no hold)
+  function bindTap(el, fn) {
+    let touched = false;
+    el.addEventListener("touchstart", (e) => { e.preventDefault(); touched = true; el.classList.add("active"); fn(); }, { passive: false });
+    el.addEventListener("touchend", (e) => { e.preventDefault(); el.classList.remove("active"); }, { passive: false });
+    el.addEventListener("click", () => { if (touched) { touched = false; return; } fn(); });
+  }
+  bindTap(document.getElementById("b-weapon"), switchWeapon);
+  bindTap(document.getElementById("god-btn"), toggleGod);
   document.getElementById("pause-btn").addEventListener("click", togglePause);
 
   // ============================================================
@@ -112,6 +123,7 @@
     hit:     () => noise(0.08, 0.20, 2200),
     explode: () => { noise(0.35, 0.45, 900); tone(160, 0.3, "sawtooth", 0.18, 50); },
     coin:    () => { tone(988, 0.06, "square", 0.18); setTimeout(() => tone(1319, 0.10, "square", 0.18), 60); },
+    swap:    () => tone(660, 0.05, "square", 0.16, 920),
     power:   () => { tone(523, 0.09, "square", 0.2); setTimeout(() => tone(784, 0.12, "square", 0.2), 90); setTimeout(() => tone(1046, 0.14, "square", 0.2), 200); },
     hurt:    () => { tone(220, 0.3, "sawtooth", 0.28, 70); noise(0.2, 0.28, 700); },
     bossHit: () => tone(120, 0.06, "square", 0.16, 90),
@@ -243,7 +255,7 @@
   // ============================================================
   let player, bullets, eBullets, enemies, particles, pickups, coins, platforms, boss;
   let camX, score, lives, coinCount, shootCD, flashT, frame, gameState;
-  let level, levelW, theme, fireMul, bannerT, pendingAdvance;
+  let level, levelW, theme, fireMul, bannerT, pendingAdvance, godMode = false;
 
   function rect(x, y, w, h) { return { x, y, w, h }; }
   function overlap(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
@@ -251,7 +263,18 @@
 
   function makePlayer() {
     return { x: 40, y: GROUND_Y - 30, w: 14, h: 30, vx: 0, vy: 0, facing: 1,
-      onGround: false, prone: false, weapon: "default", invuln: 0, hp: 4, hpMax: 4 };
+      onGround: false, prone: false, weapon: "default", owned: ["default"], invuln: 0, hp: 4, hpMax: 4 };
+  }
+  function switchWeapon() {
+    if (!player || player.owned.length < 2) return;
+    const i = player.owned.indexOf(player.weapon);
+    player.weapon = player.owned[(i + 1) % player.owned.length];
+    SFX.swap();
+  }
+  function toggleGod() {
+    godMode = !godMode;
+    const b = document.getElementById("god-btn"); if (b) b.classList.toggle("on", godMode);
+    if (godMode && player) player.invuln = 0;
   }
   function makeSoldier(x) { return { type: "soldier", x, y: GROUND_Y - 26, w: 14, h: 26, vx: 0, vy: 0, hp: 1, fireCD: (60 + Math.random() * 90) * fireMul, alive: true, active: false }; }
   function makeHeavy(x)   { return { type: "heavy", x, y: GROUND_Y - 30, w: 18, h: 30, vx: 0, vy: 0, hp: 5, fireCD: (70 + Math.random() * 40) * fireMul, alive: true, active: false }; }
@@ -340,12 +363,12 @@
     if (boss.alive && boss.active && dist(boss.x + boss.w / 2, boss.y + boss.h / 2, x, y) < radius + 22) hurtBoss(dmg);
   }
   function playerHit() {
-    if (player.invuln > 0) return;
+    if (godMode || player.invuln > 0) return;
     player.hp--; flashT = 8; SFX.hurt(); burst(player.x + 7, player.y + 15, "#ff5050", 20);
     if (player.hp <= 0) {
       lives--;
       if (lives <= 0) { gameState = "over"; SFX.over(); showOverlay("gameover-screen", "over-score", "SCORE " + score); }
-      else { const w = player.weapon; player = makePlayer(); player.weapon = w; player.x = camX + 40; player.invuln = 150; }
+      else { const w = player.weapon, owned = player.owned; player = makePlayer(); player.weapon = w; player.owned = owned; player.x = camX + 40; player.invuln = 150; }
     } else player.invuln = 70;
   }
 
@@ -443,7 +466,15 @@
       if (overlap(rect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2), p)) { eBullets.splice(i, 1); playerHit(); }
     }
     for (const c of coins) { if (c.taken) continue; c.t += 0.15; if (overlap(p, { x: c.x - 6, y: c.y - 6, w: 12, h: 12 })) { c.taken = true; coinCount++; score += 25; SFX.coin(); burst(c.x, c.y, "#ffd23f", 6); } }
-    for (const pk of pickups) { if (pk.taken) continue; pk.t += 0.1; if (overlap(p, pk)) { pk.taken = true; player.weapon = PICKUP_WEAPON[pk.kind] || "spread"; score += 50; SFX.power(); burst(pk.x + 8, pk.y + 8, "#3fd0ff", 18); } }
+    for (const pk of pickups) {
+      if (pk.taken) continue; pk.t += 0.1;
+      if (overlap(p, pk)) {
+        pk.taken = true;
+        const wname = PICKUP_WEAPON[pk.kind] || "spread";
+        if (!player.owned.includes(wname)) player.owned.push(wname);
+        player.weapon = wname; score += 50; SFX.power(); burst(pk.x + 8, pk.y + 8, "#3fd0ff", 18);
+      }
+    }
     for (let i = particles.length - 1; i >= 0; i--) { const pt = particles[i]; pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.15; pt.life--; if (pt.life <= 0) particles.splice(i, 1); }
     if (p.y > VH + 40) playerHit();
   }
@@ -639,7 +670,10 @@
     ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, bw, bh);
     ctx.fillStyle = "#cfd6e0"; ctx.fillRect(38, 21, 12, 3); ctx.fillRect(38, 21, 3, 6);
     ctx.fillStyle = "#fff"; ctx.font = "bold 12px Trebuchet MS, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText("x" + lives, 54, 24);
-    ctx.fillStyle = "#ffd23f"; ctx.font = "bold 10px Trebuchet MS, sans-serif"; ctx.fillText(WEAPONS[player ? player.weapon : "default"].name, 86, 24);
+    ctx.fillStyle = "#ffd23f"; ctx.font = "bold 10px Trebuchet MS, sans-serif";
+    const wlabel = WEAPONS[player ? player.weapon : "default"].name + (player && player.owned.length > 1 ? " (" + player.owned.length + ")" : "");
+    ctx.fillText(wlabel, 86, 24);
+    if (godMode) { ctx.fillStyle = "#ffd23f"; ctx.font = "bold 10px Trebuchet MS, sans-serif"; ctx.fillText("★GOD", 150, 24); }
     const coinX = VW - 92;
     ctx.fillStyle = "#caa31a"; ctx.beginPath(); ctx.arc(coinX, 15, 8, 0, 7); ctx.fill();
     ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(coinX, 15, 6, 0, 7); ctx.fill();

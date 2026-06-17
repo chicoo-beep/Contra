@@ -57,15 +57,27 @@
   #b-jump { right: 0;    bottom: 67px;  background: rgba(80,220,120,0.48); } /* JUMP */
   .act small { font-size: 11px; letter-spacing: 1px; }
 
-  /* pause button */
-  #pause-btn {
-    pointer-events: auto; position: absolute; top: 10px; right: 10px;
-    width: 44px; height: 44px; border-radius: 10px;
-    background: rgba(20,28,40,0.45); border: 2px solid rgba(255,255,255,0.5);
-    display: none; align-items: center; justify-content: center; color: #fff; font-size: 18px;
-    z-index: 12;
+  /* weapon-switch button (centre bottom) */
+  #b-weapon {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: calc(18px + var(--pad)); width: 62px; height: 62px; border-radius: 50%;
+    font-size: 13px; letter-spacing: 1px; background: rgba(200,140,40,0.45);
   }
-  .touch #pause-btn, .show-pause #pause-btn { display: flex; }
+  #b-weapon.active { transform: translateX(-50%) scale(0.92); }
+
+  /* top-right buttons */
+  #pause-btn, #god-btn {
+    pointer-events: auto; position: absolute; top: 10px;
+    height: 44px; border-radius: 10px;
+    background: rgba(20,28,40,0.45); border: 2px solid rgba(255,255,255,0.5);
+    display: none; align-items: center; justify-content: center; color: #fff;
+    font-weight: bold; z-index: 12;
+  }
+  #pause-btn { right: 10px; width: 44px; font-size: 18px; }
+  #god-btn   { right: 62px; padding: 0 12px; font-size: 12px; }
+  #god-btn.on { background: rgba(255,210,0,0.65); color: #20160a; border-color: #ffd200; }
+  .touch #pause-btn, .show-pause #pause-btn,
+  .touch #god-btn,   .show-pause #god-btn { display: flex; }
 
   /* ---------- Overlays ---------- */
   .overlay {
@@ -119,6 +131,8 @@
       <div class="ctlbtn act" id="b-jump" data-key="jump"><small>JUMP</small></div>
       <div class="ctlbtn act" id="b-down" data-key="down">▼</div>
     </div>
+    <div class="ctlbtn ctl" id="b-weapon">⟳<br>WPN</div>
+    <div id="god-btn">GOD</div>
     <div id="pause-btn">❚❚</div>
   </div>
 
@@ -129,8 +143,9 @@
     <div class="help">
       <b>Turn your phone sideways.</b><br>
       <b>◀ ▶</b> move · <b>▲ ▼</b> aim up/down · <b>JUMP</b> · <b>FIRE</b><br>
-      <b>Keyboard:</b> ←→ move · ↑↓ aim · Z jump · X fire · P pause<br>
-      Grab <b>coins</b> &amp; the <b>S</b> pod (spread gun). Beat the boss!
+      <b>WPN</b> switch weapon · <b>GOD</b> invincibility toggle<br>
+      <b>Keyboard:</b> ←→ move · ↑↓ aim · Z jump · X fire · Q weapon · G god · P pause<br>
+      Grab <b>S / F / R</b> pods for spread, flame &amp; rockets. Beat the bosses!
     </div>
   </div>
 
