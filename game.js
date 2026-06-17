@@ -106,8 +106,10 @@
   const SFX = {
     shoot:   () => tone(820, 0.07, "square", 0.15, 360),
     spread:  () => { tone(700, 0.08, "sawtooth", 0.13, 320); tone(520, 0.08, "square", 0.09, 240); },
+    flame:   () => noise(0.07, 0.10, 1600),
+    rocket:  () => { tone(180, 0.18, "sawtooth", 0.2, 520); noise(0.12, 0.12, 1400); },
     jump:    () => tone(320, 0.16, "square", 0.18, 680),
-    hit:     () => noise(0.08, 0.22, 2200),
+    hit:     () => noise(0.08, 0.20, 2200),
     explode: () => { noise(0.35, 0.45, 900); tone(160, 0.3, "sawtooth", 0.18, 50); },
     coin:    () => { tone(988, 0.06, "square", 0.18); setTimeout(() => tone(1319, 0.10, "square", 0.18), 60); },
     power:   () => { tone(523, 0.09, "square", 0.2); setTimeout(() => tone(784, 0.12, "square", 0.2), 90); setTimeout(() => tone(1046, 0.14, "square", 0.2), 200); },
@@ -128,15 +130,14 @@
     C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46
   };
   const Z = 0;
-  // Each step = [bassFreq, leadFreq]; 16 steps per loop.
   const MUSIC = {
-    1: { stepDur: 0.214, steps: [   // Am – F – C – G, upbeat
+    1: { stepDur: 0.214, steps: [
       [HZ.A2, HZ.A4], [Z, HZ.C5], [HZ.A2, HZ.E5], [Z, HZ.C5],
       [HZ.F2, HZ.A4], [Z, HZ.C5], [HZ.F2, HZ.F4], [Z, HZ.C5],
       [HZ.C3, HZ.C5], [Z, HZ.E5], [HZ.C3, HZ.G4], [Z, HZ.E5],
       [HZ.G2, HZ.B4], [Z, HZ.D5], [HZ.G2, HZ.G4], [Z, HZ.D5]
     ] },
-    2: { stepDur: 0.188, steps: [   // Dm – Bb – F – C, darker & faster
+    2: { stepDur: 0.188, steps: [
       [HZ.D2, HZ.D5], [Z, HZ.F4], [HZ.D2, HZ.A4], [Z, HZ.F4],
       [HZ.AS2, HZ.AS4], [Z, HZ.D5], [HZ.AS2, HZ.F4], [Z, HZ.D5],
       [HZ.F2, HZ.C5], [Z, HZ.A4], [HZ.F2, HZ.F4], [Z, HZ.A4],
@@ -144,7 +145,6 @@
     ] }
   };
   let musicPlaying = false, musicOn = true, musicStep = 0, nextNoteTime = 0, musicInterval = null;
-
   function mOsc(freq, start, dur, type, vol) {
     const o = actx.createOscillator(), g = actx.createGain();
     o.type = type; o.frequency.setValueAtTime(freq, start);
@@ -172,8 +172,8 @@
     if (st[0]) mOsc(st[0], t, pat.stepDur * 1.9, "triangle", 0.22);
     if (st[1]) mOsc(st[1], t, pat.stepDur * 0.85, "square", 0.10);
     if (s % 4 === 0) mKick(t);
-    if (s === 4 || s === 12) mNoise(t, 0.12, 0.10, 3500);   // snare
-    if (s % 2 === 1) mNoise(t, 0.03, 0.04, 9000);            // hi-hat
+    if (s === 4 || s === 12) mNoise(t, 0.12, 0.10, 3500);
+    if (s % 2 === 1) mNoise(t, 0.03, 0.04, 9000);
   }
   function musicTick() {
     if (!actx || !musicPlaying) return;
@@ -189,40 +189,52 @@
     musicPlaying = true; musicStep = 0; nextNoteTime = actx.currentTime + 0.1;
     musicInterval = setInterval(musicTick, 25);
   }
-  function toggleMusic() {
-    musicOn = !musicOn;
-    if (musicGain) musicGain.gain.value = musicOn ? 0.32 : 0;
-  }
+  function toggleMusic() { musicOn = !musicOn; if (musicGain) musicGain.gain.value = musicOn ? 0.32 : 0; }
+
+  // ============================================================
+  //  Weapons
+  // ============================================================
+  const WEAPONS = {
+    default: { cd: 4,  name: "RIFLE" },
+    spread:  { cd: 6,  name: "SPREAD" },
+    flame:   { cd: 2,  name: "FLAME" },
+    rocket:  { cd: 22, name: "ROCKET" }
+  };
+  const PICKUP_WEAPON = { S: "spread", F: "flame", R: "rocket" };
 
   // ============================================================
   //  Level data
   // ============================================================
   const LEVELS = {
     1: {
-      w: 4600, name: "JUNGLE VILLAGE", fireMul: 1, bossHp: 50,
+      w: 4600, name: "JUNGLE VILLAGE", fireMul: 1, bossHp: 56,
       theme: { skyTop: "#7ec7f5", skyMid: "#aee0f7", skyBot: "#e9d9c7", sun: "#fff3c4",
                hillFar: "#d98fb0", hillNear: "#7cc05a", ground: "#6b4a2c", grass: "#4caf3f",
                cobble: "#5a3d24", roof1: "#5a6fb0", wall1: "#e8e3d4", roof2: "#7a4a8c", wall2: "#efe6d6",
                trunk: "#6b4a2a", leaf1: "#3f8f3a", leaf2: "#4fa84a" },
       platforms: [[360,172,90,10],[560,140,80,10],[720,178,100,10],[980,150,90,10],[1180,120,80,10],[1360,175,110,10],[1680,160,90,10],[1880,128,80,10],[2080,170,100,10],[2380,150,90,10],[2620,175,110,10],[2960,145,90,10],[3200,175,120,10],[3500,150,90,10],[3760,170,110,10]],
-      soldiers: [430,900,1500,2010,2540,3080,3600,3950],
+      soldiers: [430,700,1000,1300,1600,1950,2300,2650,3000,3350,3700,4000],
+      heavies:  [1150,2200,3250,3900],
+      jumpers:  [820,1500,2050,2800,3450],
       turrets:  [[720,162],[1360,159],[2080,154],[2620,159],[3760,154]],
-      drones:   [[600,80],[1180,90],[1700,80],[2200,95],[2700,85],[3250,80],[3700,90]],
+      drones:   [[600,80],[1000,92],[1400,80],[1800,95],[2200,82],[2600,88],[3000,80],[3400,92],[3800,84]],
       coinSpots:[200,470,760,1020,1300,1560,1820,2120,2420,2700,3000,3300,3560,3820,4080],
-      pickups:  [[600,110],[2200,150]]
+      pickups:  [[600,110,"S"],[1500,150,"F"],[2800,150,"R"]]
     },
     2: {
-      w: 4900, name: "SUNSET RUINS", fireMul: 0.72, bossHp: 78,
+      w: 4900, name: "SUNSET RUINS", fireMul: 0.72, bossHp: 88,
       theme: { skyTop: "#3b2a55", skyMid: "#c0567a", skyBot: "#f2a45c", sun: "#ffe2a0",
                hillFar: "#6a3f70", hillNear: "#8a4a55", ground: "#7a5230", grass: "#caa24a",
                cobble: "#5e3c22", roof1: "#4a3a6a", wall1: "#cdbfa6", roof2: "#7a3a4a", wall2: "#d8c4a8",
                trunk: "#5a3a24", leaf1: "#7a8a3a", leaf2: "#94a44a" },
       platforms: [[300,160,90,10],[520,130,80,10],[700,170,90,10],[900,140,90,10],[1120,165,100,10],[1340,120,80,10],[1560,160,90,10],[1820,135,90,10],[2040,170,100,10],[2300,140,90,10],[2540,165,100,10],[2820,130,80,10],[3060,170,110,10],[3340,145,90,10],[3600,165,100,10],[3900,140,90,10],[4150,170,110,10]],
-      soldiers: [360,780,1180,1600,2020,2440,2860,3280,3700,4050,4300],
+      soldiers: [360,640,920,1200,1480,1760,2040,2320,2600,2880,3160,3440,3720,4000,4300],
+      heavies:  [1000,1900,2750,3600,4200],
+      jumpers:  [700,1350,2100,2900,3500,4050],
       turrets:  [[700,154],[1340,104],[2040,154],[2820,114],[3600,149],[4150,154]],
-      drones:   [[450,80],[1000,90],[1500,80],[1950,95],[2400,82],[2900,88],[3400,80],[3850,92],[4250,84]],
+      drones:   [[450,80],[1000,90],[1500,80],[1950,95],[2400,82],[2900,88],[3400,80],[3850,92],[4250,84],[2200,70],[3100,72]],
       coinSpots:[250,560,880,1200,1520,1840,2160,2480,2800,3120,3440,3760,4080,4350,4600],
-      pickups:  [[520,100],[2300,110]]
+      pickups:  [[520,100,"F"],[2300,110,"R"],[3500,150,"S"]]
     }
   };
 
@@ -231,16 +243,19 @@
   // ============================================================
   let player, bullets, eBullets, enemies, particles, pickups, coins, platforms, boss;
   let camX, score, lives, coinCount, shootCD, flashT, frame, gameState;
-  let level, levelW, theme, fireMul, bannerT;
+  let level, levelW, theme, fireMul, bannerT, pendingAdvance;
 
   function rect(x, y, w, h) { return { x, y, w, h }; }
   function overlap(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+  function dist(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
 
   function makePlayer() {
     return { x: 40, y: GROUND_Y - 30, w: 14, h: 30, vx: 0, vy: 0, facing: 1,
       onGround: false, prone: false, weapon: "default", invuln: 0, hp: 4, hpMax: 4 };
   }
   function makeSoldier(x) { return { type: "soldier", x, y: GROUND_Y - 26, w: 14, h: 26, vx: 0, vy: 0, hp: 1, fireCD: (60 + Math.random() * 90) * fireMul, alive: true, active: false }; }
+  function makeHeavy(x)   { return { type: "heavy", x, y: GROUND_Y - 30, w: 18, h: 30, vx: 0, vy: 0, hp: 5, fireCD: (70 + Math.random() * 40) * fireMul, alive: true, active: false }; }
+  function makeJumper(x)  { return { type: "jumper", x, y: GROUND_Y - 22, w: 14, h: 22, vx: 0, vy: 0, hp: 2, jumpCD: 30 + Math.random() * 50, alive: true, active: false }; }
   function makeTurret(x, y) { return { type: "turret", x, y, w: 18, h: 16, hp: 3, fireCD: 90 * fireMul, alive: true, active: false }; }
   function makeDrone(x, y) { return { type: "drone", x, y, baseY: y, w: 22, h: 14, hp: 2, fireCD: (80 + Math.random() * 50) * fireMul, t: Math.random() * 6, alive: true, active: false }; }
   function makeBoss(hp) { return { x: levelW - 150, y: GROUND_Y - 80, w: 56, h: 80, hp, hpMax: hp, fireCD: 70, alive: true, active: false, coreT: 0, pulse: 0 }; }
@@ -252,52 +267,77 @@
     platforms = L.platforms.map((p) => rect(p[0], p[1], p[2], p[3]));
     enemies = [];
     L.soldiers.forEach((x) => enemies.push(makeSoldier(x)));
+    (L.heavies || []).forEach((x) => enemies.push(makeHeavy(x)));
+    (L.jumpers || []).forEach((x) => enemies.push(makeJumper(x)));
     L.turrets.forEach((t) => enemies.push(makeTurret(t[0], t[1])));
     L.drones.forEach((d) => enemies.push(makeDrone(d[0], d[1])));
     coins = [];
     L.coinSpots.forEach((sx) => { for (let i = 0; i < 5; i++) coins.push({ x: sx + i * 18, y: 150 - Math.sin((i / 4) * Math.PI) * 34, taken: false, t: i }); });
-    pickups = L.pickups.map((p) => ({ x: p[0], y: p[1], w: 16, h: 16, kind: "S", t: 0 }));
+    pickups = L.pickups.map((p) => ({ x: p[0], y: p[1], w: 16, h: 16, kind: p[2], t: 0 }));
     boss = makeBoss(L.bossHp);
     bullets = []; eBullets = []; particles = [];
-    // reposition player at the start, keep stats/weapon, refill health
     player.x = 40; player.y = GROUND_Y - 30; player.vx = 0; player.vy = 0; player.prone = false;
     player.hp = player.hpMax; player.invuln = 100;
     camX = 0; shootCD = 0; bannerT = 130;
   }
-
   function resetGame() {
     player = makePlayer();
-    score = 0; lives = 10; coinCount = 0; flashT = 0; frame = 0;
+    score = 0; lives = 10; coinCount = 0; flashT = 0; frame = 0; pendingAdvance = false;
     loadLevel(1);
   }
-
-  function advanceLevel() {
-    SFX.fanfare();
-    loadLevel(2);
-  }
+  function advanceLevel() { SFX.fanfare(); loadLevel(2); }
 
   // ============================================================
   //  Combat
   // ============================================================
-  function firePlayer() {
-    const speed = 6.6;
+  function aimVector() {
     let dx = player.facing, dy = 0;
     const up = input.up, down = input.down && !player.onGround;
     if (up && (input.left || input.right)) { dx = player.facing; dy = -1; }
     else if (up) { dx = 0; dy = -1; }
     else if (down) { dx = player.facing; dy = 1; }
-    else { dx = player.facing; dy = 0; }
-    const mag = Math.hypot(dx, dy) || 1, nx = (dx / mag) * speed, ny = (dy / mag) * speed;
-    const mx = player.x + player.w / 2 + dx * 8, my = player.y + (player.prone ? player.h - 6 : 10);
-    if (player.weapon === "spread") {
-      for (let a = -2; a <= 2; a++) { const ang = Math.atan2(ny, nx) + a * 0.16; bullets.push({ x: mx, y: my, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, r: 3, spread: true, dmg: 2 }); }
+    return { dx, dy };
+  }
+  function firePlayer() {
+    const w = player.weapon, { dx, dy } = aimVector();
+    const mag = Math.hypot(dx, dy) || 1, ux = dx / mag, uy = dy / mag;
+    const mx = player.x + player.w / 2 + ux * 9, my = player.y + (player.prone ? player.h - 6 : 10);
+    if (w === "spread") {
+      const sp = 6.6, base = Math.atan2(uy, ux);
+      for (let a = -2; a <= 2; a++) { const ang = base + a * 0.16; bullets.push({ kind: "bullet", x: mx, y: my, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, r: 3, dmg: 2, spread: true }); }
       SFX.spread();
-    } else { bullets.push({ x: mx, y: my, vx: nx, vy: ny, r: 3, spread: false, dmg: 2 }); SFX.shoot(); }
-    shootCD = player.weapon === "spread" ? 6 : 4;
+    } else if (w === "flame") {
+      const sp = 4.2, base = Math.atan2(uy, ux);
+      for (let i = 0; i < 3; i++) { const ang = base + (Math.random() - 0.5) * 0.5, s = sp * (0.7 + Math.random() * 0.6); bullets.push({ kind: "flame", x: mx, y: my, vx: Math.cos(ang) * s, vy: Math.sin(ang) * s, r: 2.5, dmg: 1, life: 16 }); }
+      SFX.flame();
+    } else if (w === "rocket") {
+      const sp = 4.4; bullets.push({ kind: "rocket", x: mx, y: my, vx: ux * sp, vy: uy * sp, r: 5, dmg: 9 });
+      SFX.rocket();
+    } else {
+      const sp = 6.6; bullets.push({ kind: "bullet", x: mx, y: my, vx: ux * sp, vy: uy * sp, r: 3, dmg: 2, spread: false });
+      SFX.shoot();
+    }
+    shootCD = WEAPONS[w].cd;
   }
   function enemyShoot(ex, ey, tx, ty, speed) { const ang = Math.atan2(ty - ey, tx - ex); eBullets.push({ x: ex, y: ey, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, r: 3 }); }
   function burst(x, y, color, n) {
     for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, s = 1 + Math.random() * 3; particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, life: 18 + Math.random() * 14, color }); }
+  }
+  function killReward(e) { score += e.type === "turret" ? 300 : e.type === "drone" ? 200 : e.type === "heavy" ? 250 : 100; burst(e.x + e.w / 2, e.y + e.h / 2, "#ff8c3f", 16); SFX.explode(); }
+  function hurtEnemy(e, dmg) { if (!e.alive) return; e.hp -= dmg; if (e.hp <= 0) { e.alive = false; killReward(e); } else SFX.hit(); }
+  function hurtBoss(dmg) {
+    if (!boss.alive) return;
+    boss.hp -= dmg; boss.pulse = 6; score += Math.ceil(dmg); SFX.bossHit();
+    if (boss.hp <= 0) {
+      boss.alive = false; burst(boss.x + 28, boss.y + 40, "#ff5a3c", 60); score += 2000; SFX.bossDie();
+      if (level === 1) pendingAdvance = true;     // defer level switch to end of frame (avoids mid-loop array swap)
+      else { gameState = "win"; SFX.fanfare(); showOverlay("win-screen", "win-score", "SCORE " + score); }
+    }
+  }
+  function explodeAt(x, y, radius, dmg) {
+    burst(x, y, "#ffb13f", 26); burst(x, y, "#ffec80", 14); SFX.explode();
+    for (const e of enemies) { if (!e.alive) continue; if (dist(e.x + e.w / 2, e.y + e.h / 2, x, y) < radius) hurtEnemy(e, dmg); }
+    if (boss.alive && boss.active && dist(boss.x + boss.w / 2, boss.y + boss.h / 2, x, y) < radius + 22) hurtBoss(dmg);
   }
   function playerHit() {
     if (player.invuln > 0) return;
@@ -344,29 +384,23 @@
     camX += (target - camX) * 0.12;
     if (camX < 0) camX = 0; if (camX > levelW - VW) camX = levelW - VW;
 
+    // player projectiles
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i]; b.x += b.vx; b.y += b.vy;
-      if (b.x < camX - 20 || b.x > camX + VW + 20 || b.y < -20 || b.y > VH + 20) { bullets.splice(i, 1); continue; }
-      let hit = false; const bb = rect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2), dmg = b.dmg || 1;
+      if (b.kind === "flame") { b.life--; b.r += 0.22; b.vy += 0.03; if (b.life <= 0) { bullets.splice(i, 1); continue; } }
+      if (b.x < camX - 30 || b.x > camX + VW + 30 || b.y < -30 || b.y > VH + 30) { bullets.splice(i, 1); continue; }
+      let hit = false; const bb = rect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
       for (const e of enemies) {
         if (!e.alive) continue;
-        if (overlap(bb, e)) {
-          e.hp -= dmg; hit = true; burst(b.x, b.y, "#ffd23f", 5);
-          if (e.hp <= 0) { e.alive = false; score += e.type === "turret" ? 300 : e.type === "drone" ? 200 : 100; burst(e.x + e.w / 2, e.y + e.h / 2, "#ff8c3f", 16); SFX.explode(); } else SFX.hit();
-          break;
-        }
+        if (overlap(bb, e)) { if (b.kind === "rocket") explodeAt(b.x, b.y, 48, b.dmg); else hurtEnemy(e, b.dmg); hit = true; break; }
       }
-      if (!hit && boss.alive && boss.active && overlap(bb, boss)) {
-        boss.hp -= dmg; hit = true; boss.pulse = 6; burst(b.x, b.y, "#ffef7a", 6); score += 5; SFX.bossHit();
-        if (boss.hp <= 0) {
-          boss.alive = false; burst(boss.x + 28, boss.y + 40, "#ff5a3c", 60); score += 2000; SFX.bossDie();
-          if (level === 1) advanceLevel();
-          else { gameState = "win"; SFX.fanfare(); showOverlay("win-screen", "win-score", "SCORE " + score); }
-        }
-      }
+      if (!hit && boss.alive && boss.active && overlap(bb, boss)) { if (b.kind === "rocket") explodeAt(b.x, b.y, 48, b.dmg); else hurtBoss(b.dmg); hit = true; }
       if (hit) bullets.splice(i, 1);
     }
+    // deferred level transition (boss of level 1 cleared)
+    if (pendingAdvance) { pendingAdvance = false; advanceLevel(); return; }
 
+    // enemies
     for (const e of enemies) {
       if (!e.alive) continue;
       if (!e.active && e.x < camX + VW + 60 && e.x > camX - 80) e.active = true;
@@ -374,6 +408,13 @@
       if (e.type === "soldier") {
         e.x += (p.x > e.x ? 1 : -1) * 0.7; e.vy += GRAVITY; e.y += e.vy; if (e.y + e.h >= GROUND_Y) { e.y = GROUND_Y - e.h; e.vy = 0; }
         if (--e.fireCD <= 0 && Math.abs(e.x - p.x) < 230) { enemyShoot(e.x + 7, e.y + 8, p.x + 7, p.y + 12, 2.6); e.fireCD = (110 + Math.random() * 60) * fireMul; }
+      } else if (e.type === "heavy") {
+        e.x += (p.x > e.x ? 1 : -1) * 0.45; e.vy += GRAVITY; e.y += e.vy; if (e.y + e.h >= GROUND_Y) { e.y = GROUND_Y - e.h; e.vy = 0; }
+        if (--e.fireCD <= 0 && Math.abs(e.x - p.x) < 250) { enemyShoot(e.x + 9, e.y + 10, p.x + 7, p.y + 12, 2.5); enemyShoot(e.x + 9, e.y + 14, p.x + 7, p.y + 16, 2.5); e.fireCD = (75 + Math.random() * 35) * fireMul; }
+      } else if (e.type === "jumper") {
+        e.x += (p.x > e.x ? 1 : -1) * 0.9; e.vy += GRAVITY; e.y += e.vy;
+        let onG = false; if (e.y + e.h >= GROUND_Y) { e.y = GROUND_Y - e.h; e.vy = 0; onG = true; }
+        if (onG) { if (--e.jumpCD <= 0) { e.vy = -8.2; e.jumpCD = 55 + Math.random() * 45; } }
       } else if (e.type === "turret") {
         if (--e.fireCD <= 0 && Math.abs(e.x - p.x) < 250) { enemyShoot(e.x + 9, e.y + 6, p.x + 7, p.y + 12, 2.3); e.fireCD = 95 * fireMul; }
       } else if (e.type === "drone") {
@@ -402,7 +443,7 @@
       if (overlap(rect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2), p)) { eBullets.splice(i, 1); playerHit(); }
     }
     for (const c of coins) { if (c.taken) continue; c.t += 0.15; if (overlap(p, { x: c.x - 6, y: c.y - 6, w: 12, h: 12 })) { c.taken = true; coinCount++; score += 25; SFX.coin(); burst(c.x, c.y, "#ffd23f", 6); } }
-    for (const pk of pickups) { if (pk.taken) continue; pk.t += 0.1; if (overlap(p, pk)) { pk.taken = true; player.weapon = "spread"; score += 50; SFX.power(); burst(pk.x + 8, pk.y + 8, "#3fd0ff", 18); } }
+    for (const pk of pickups) { if (pk.taken) continue; pk.t += 0.1; if (overlap(p, pk)) { pk.taken = true; player.weapon = PICKUP_WEAPON[pk.kind] || "spread"; score += 50; SFX.power(); burst(pk.x + 8, pk.y + 8, "#3fd0ff", 18); } }
     for (let i = particles.length - 1; i >= 0; i--) { const pt = particles[i]; pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.15; pt.life--; if (pt.life <= 0) particles.splice(i, 1); }
     if (p.y > VH + 40) playerHit();
   }
@@ -416,7 +457,7 @@
     drawGround(); platforms.forEach(drawPlatform); coins.forEach(drawCoin); pickups.forEach(drawPickup);
     enemies.forEach((e) => e.alive && drawEnemy(e));
     if (boss.alive) drawBoss();
-    for (const b of bullets) { ctx.fillStyle = b.spread ? "#ff9f1c" : "#fff36b"; ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 1, 0, 7); ctx.fill(); }
+    drawBullets();
     ctx.fillStyle = "#ff5a5a"; for (const b of eBullets) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill(); }
     drawPlayer();
     for (const pt of particles) { ctx.globalAlpha = Math.max(0, pt.life / 24); ctx.fillStyle = pt.color; ctx.fillRect(pt.x - 1, pt.y - 1, 3, 3); }
@@ -425,6 +466,22 @@
     if (flashT > 0) { ctx.fillStyle = "rgba(255,40,40," + (flashT / 18) + ")"; ctx.fillRect(0, 0, VW, VH); }
     if (bannerT > 0 && gameState === "playing") drawBanner();
     if (gameState === "paused") drawPaused();
+  }
+
+  function drawBullets() {
+    for (const b of bullets) {
+      if (b.kind === "flame") {
+        ctx.globalAlpha = Math.max(0, b.life / 18);
+        ctx.fillStyle = b.life > 10 ? "#fff3a0" : (b.life > 5 ? "#ff9f1c" : "#e7402c");
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+      } else if (b.kind === "rocket") {
+        ctx.fillStyle = "#ffb13f"; ctx.beginPath(); ctx.arc(b.x - b.vx * 0.6, b.y - b.vy * 0.6, 3, 0, 7); ctx.fill();
+        ctx.fillStyle = "#cfd6e0"; ctx.fillRect(b.x - 4, b.y - 2, 8, 4);
+        ctx.fillStyle = "#e74c3c"; ctx.fillRect(b.x + (b.vx >= 0 ? 3 : -5), b.y - 1, 2, 2);
+      } else {
+        ctx.fillStyle = b.spread ? "#ff9f1c" : "#fff36b"; ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 1, 0, 7); ctx.fill();
+      }
+    }
   }
 
   function drawSky() {
@@ -438,7 +495,6 @@
     for (let i = -1; i < 4; i++) cloud(i * 260 + 120 - co, 50 + (i % 2) * 18);
   }
   function cloud(x, y) { ctx.beginPath(); ctx.arc(x, y, 12, 0, 7); ctx.arc(x + 14, y + 2, 16, 0, 7); ctx.arc(x + 32, y, 12, 0, 7); ctx.fill(); }
-
   function drawHills() {
     let off = (camX * 0.2) % 300; ctx.fillStyle = theme.hillFar;
     for (let i = -1; i < 4; i++) hill(i * 300 - off, 200, 150, 90);
@@ -446,7 +502,6 @@
     for (let i = -1; i < 5; i++) hill(i * 260 - off, 210, 140, 70);
   }
   function hill(x, baseY, w, h) { ctx.beginPath(); ctx.moveTo(x, baseY); ctx.quadraticCurveTo(x + w / 2, baseY - h, x + w, baseY); ctx.lineTo(x + w, VH); ctx.lineTo(x, VH); ctx.closePath(); ctx.fill(); }
-
   function drawVillage() {
     const off = (camX * 0.6) % 300;
     for (let i = -1; i < 4; i++) {
@@ -467,7 +522,6 @@
     ctx.fillStyle = "#8fd0ef"; ctx.fillRect(x + 8, roofY + 24, 12, 12); ctx.fillRect(x + w - 20, roofY + 24, 12, 12);
     ctx.strokeStyle = "#3a2a1a"; ctx.lineWidth = 1; ctx.strokeRect(x + 8, roofY + 24, 12, 12); ctx.strokeRect(x + w - 20, roofY + 24, 12, 12);
   }
-
   function drawGround() {
     const x0 = camX - 10, w = VW + 20;
     ctx.fillStyle = theme.ground; ctx.fillRect(x0, GROUND_Y + 6, w, VH - GROUND_Y);
@@ -490,16 +544,20 @@
   function drawPickup(pk) {
     if (pk.taken) return;
     const y = pk.y + Math.sin(pk.t) * 3;
+    const col = pk.kind === "F" ? "#ff7a1c" : pk.kind === "R" ? "#5b8c5a" : "#e7402c";
     ctx.fillStyle = "#101820"; ctx.fillRect(pk.x - 1, y - 1, 18, 18);
-    ctx.fillStyle = "#e7402c"; ctx.fillRect(pk.x, y, 16, 16);
-    ctx.fillStyle = "#ffd23f"; ctx.font = "bold 12px monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("S", pk.x + 8, y + 9);
+    ctx.fillStyle = col; ctx.fillRect(pk.x, y, 16, 16);
+    ctx.fillStyle = "#ffd23f"; ctx.font = "bold 12px monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(pk.kind, pk.x + 8, y + 9);
   }
 
   function drawPlayer() {
     const p = player;
     if (p.invuln > 0 && Math.floor(frame / 4) % 2 === 0) return;
     const x = Math.round(p.x), y = Math.round(p.y), f = p.facing;
-    const skin = "#f0c090", suit = p.weapon === "spread" ? "#e85d4e" : "#2e7d4f", suitD = p.weapon === "spread" ? "#b8412f" : "#1f5c39", boot = "#26324a";
+    const skin = "#f0c090";
+    const suit = p.weapon === "spread" ? "#e85d4e" : p.weapon === "flame" ? "#e08a2a" : p.weapon === "rocket" ? "#6a7a3a" : "#2e7d4f";
+    const suitD = p.weapon === "spread" ? "#b8412f" : p.weapon === "flame" ? "#b5651a" : p.weapon === "rocket" ? "#4a5a26" : "#1f5c39";
+    const boot = "#26324a";
     if (p.prone) {
       ctx.fillStyle = suit; ctx.fillRect(x - 2, y + 6, 20, 8);
       ctx.fillStyle = skin; ctx.fillRect(x + (f > 0 ? 16 : -4), y + 6, 4, 4);
@@ -528,6 +586,20 @@
       ctx.fillStyle = "#e0a878"; ctx.fillRect(x + 4, y + 1, 7, 7);
       ctx.fillStyle = "#3a2a1a"; ctx.fillRect(x + 3, y, 9, 3);
       ctx.fillStyle = "#cfcf90"; ctx.fillRect(f > 0 ? x + 11 : x - 5, y + 10, 8, 2);
+    } else if (e.type === "heavy") {
+      ctx.fillStyle = "#3a0f0f"; ctx.fillRect(x + 2, y + 22, 6, 8); ctx.fillRect(x + 10, y + 22, 6, 8);
+      ctx.fillStyle = "#8a1f1f"; ctx.fillRect(x, y + 8, 18, 15);
+      ctx.fillStyle = "#5a1414"; ctx.fillRect(x, y + 8, 18, 4);
+      ctx.fillStyle = "#e0a878"; ctx.fillRect(x + 6, y + 1, 8, 7);
+      ctx.fillStyle = "#2a2a2a"; ctx.fillRect(x + 4, y, 11, 3);
+      ctx.fillStyle = "#9aa"; ctx.fillRect(f > 0 ? x + 15 : x - 8, y + 12, 11, 3);
+      ctx.fillStyle = "#ff5a5a"; for (let i = 0; i < Math.min(e.hp, 6); i++) ctx.fillRect(x + 1 + i * 3, y - 4, 2, 2);
+    } else if (e.type === "jumper") {
+      ctx.fillStyle = "#3a2466"; ctx.fillRect(x + 2, y + 16, 4, 6); ctx.fillRect(x + 8, y + 16, 4, 6);
+      ctx.fillStyle = "#6a3fb0"; ctx.fillRect(x + 2, y + 6, 10, 11);
+      ctx.fillStyle = "#f0c090"; ctx.fillRect(x + 4, y, 7, 7);
+      ctx.fillStyle = "#2a164a"; ctx.fillRect(x + 3, y + 2, 9, 3);
+      ctx.fillStyle = "#ff5a5a"; ctx.fillRect(x + (f > 0 ? 8 : 5), y + 3, 2, 1);
     } else if (e.type === "turret") {
       ctx.fillStyle = "#555f6b"; ctx.fillRect(x, y + 6, 18, 10);
       ctx.fillStyle = "#7a8794"; ctx.fillRect(x + 3, y, 12, 8);
@@ -567,7 +639,7 @@
     ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, bw, bh);
     ctx.fillStyle = "#cfd6e0"; ctx.fillRect(38, 21, 12, 3); ctx.fillRect(38, 21, 3, 6);
     ctx.fillStyle = "#fff"; ctx.font = "bold 12px Trebuchet MS, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText("x" + lives, 54, 24);
-    ctx.fillStyle = "#cfeaff"; ctx.font = "bold 10px Trebuchet MS, sans-serif"; ctx.fillText(player && player.weapon === "spread" ? "SPREAD" : "RIFLE", 86, 24);
+    ctx.fillStyle = "#ffd23f"; ctx.font = "bold 10px Trebuchet MS, sans-serif"; ctx.fillText(WEAPONS[player ? player.weapon : "default"].name, 86, 24);
     const coinX = VW - 92;
     ctx.fillStyle = "#caa31a"; ctx.beginPath(); ctx.arc(coinX, 15, 8, 0, 7); ctx.fill();
     ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(coinX, 15, 6, 0, 7); ctx.fill();
@@ -585,13 +657,12 @@
       ctx.fillStyle = "#5fe07a"; ctx.fillRect(VW / 2 - 60, 34, 120 * prog, 3);
     }
   }
-
   function drawBanner() {
     const a = Math.min(1, bannerT / 30) * Math.min(1, (130 - bannerT) / 15);
     ctx.globalAlpha = a;
     ctx.fillStyle = "#ffd23f"; ctx.font = "900 30px Trebuchet MS, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText("LEVEL " + level, VW / 2, VH / 2 - 12);
-    ctx.fillStyle = "#fff"; ctx.font = "bold 14px Trebuchet MS, sans-serif"; ctx.fillText(theme && LEVELS[level].name, VW / 2, VH / 2 + 12);
+    ctx.fillStyle = "#fff"; ctx.font = "bold 14px Trebuchet MS, sans-serif"; ctx.fillText(LEVELS[level].name, VW / 2, VH / 2 + 12);
     ctx.globalAlpha = 1; ctx.textAlign = "left";
   }
   function drawPaused() {

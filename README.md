@@ -54,9 +54,12 @@ diagonally down.
 - **Original looping background music** (a synthesized chiptune track per level —
   no copyrighted audio). Toggle with **M**.
 - 8-direction shooting, running, jumping, and prone.
-- **Enemy types:** marching soldiers, fixed turrets, hovering **drones** that
-  strafe you, and a **boss** with a health bar on each level.
-- **Coins** to collect (with a counter) and the **`S`** spread-gun pod.
+- **Four weapons** via colored pickup pods: **RIFLE** (default), **`S`** spread,
+  **`F`** flamethrower (rapid short-range stream), **`R`** rocket launcher
+  (slow, explosive splash damage that clears crowds).
+- **Enemy types:** marching soldiers, tanky **heavies** (5 HP, twin-shot),
+  leaping **jumpers**, fixed turrets, hovering **drones**, and a **boss** with a
+  health bar on each level — lots of them on screen for a chaotic, road-rage feel.
 - Polished HUD: character **portrait**, green **health bar**, coin count, level
   & score, plus a **pause** button (or press **P**).
 - **10 lives**, a buffed hero (faster, higher jump, rapid hard-hitting fire,
