@@ -47,6 +47,10 @@ diagonally down.
 
 ## 🕹 What's in this build
 
+- **Real animated pixel-art graphics** (CC0 Pixel Frog art): an animated hero
+  (idle/run/jump/fall), animated enemies, spinning fruit "coins", and tiled
+  scenic backgrounds — with automatic fallback to the original code-drawn art
+  while images load.
 - **Two levels** with distinct themes — *Level 1: Jungle Village* (bright day) and
   *Level 2: Sunset Ruins* (dusk palette, tougher & faster enemies). Beat the
   first boss to advance; clear the second boss to win. Your score, lives, coins
@@ -76,6 +80,12 @@ diagonally down.
 - Sound effects and music.
 - PWA offline support and a real installable Android APK wrapper.
 
+## 🎨 Credits
+
+- Sprite & background art: **"Pixel Adventure" by Pixel Frog**, released under
+  **CC0 1.0 (Public Domain)** — https://pixelfrog-assets.itch.io/pixel-adventure-1
+  (see `assets/CREDITS.txt`). Music & sound effects are synthesized in-browser.
+
 ---
-Made as a learning/demo project. Not affiliated with Konami; original Contra
-assets are not used — all art is generated procedurally in code.
+Made as a learning/demo project. Not affiliated with Konami; no original Contra
+assets are used.

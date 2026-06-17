@@ -14,6 +14,42 @@
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
 
+  // ============================================================
+  //  Sprite assets (CC0 Pixel Frog "Pixel Adventure"). Each sheet
+  //  is a horizontal strip of `fw`-wide frames; we slice at draw
+  //  time. Everything falls back to code-drawn art until loaded.
+  // ============================================================
+  const SPRITES = {
+    player_idle:   { src: "assets/player_idle.png",   fw: 32 },
+    player_run:    { src: "assets/player_run.png",    fw: 32 },
+    player_jump:   { src: "assets/player_jump.png",   fw: 32 },
+    player_fall:   { src: "assets/player_fall.png",   fw: 32 },
+    enemy_soldier: { src: "assets/enemy_soldier.png", fw: 32 },
+    enemy_heavy:   { src: "assets/enemy_heavy.png",   fw: 36 },
+    enemy_jumper:  { src: "assets/enemy_jumper.png",  fw: 32 },
+    enemy_turret:  { src: "assets/enemy_turret.png",  fw: 44 },
+    enemy_drone:   { src: "assets/enemy_drone.png",   fw: 32 },
+    coin:          { src: "assets/coin.png",          fw: 32 },
+    bg_level1:     { src: "assets/bg_level1.png" },
+    bg_level2:     { src: "assets/bg_level2.png" }
+  };
+  const IMG = {};
+  function loadAssets() {
+    for (const k in SPRITES) { const im = new Image(); im.onload = () => { im._ok = true; }; im.src = SPRITES[k].src; IMG[k] = im; }
+  }
+  loadAssets();
+  // Draw frame `idx` of a strip sheet into a box; returns false if image not ready.
+  function drawSprite(key, idx, dx, dy, dw, dh, flip) {
+    const im = IMG[key]; if (!im || !im._ok || !im.naturalWidth) return false;
+    const fw = SPRITES[key].fw || im.naturalWidth, fh = im.naturalHeight;
+    const frames = Math.max(1, Math.floor(im.naturalWidth / fw));
+    const fi = ((Math.floor(idx) % frames) + frames) % frames;
+    dx = Math.round(dx); dy = Math.round(dy);
+    if (flip) { ctx.save(); ctx.translate(dx + dw, dy); ctx.scale(-1, 1); ctx.drawImage(im, fi * fw, 0, fw, fh, 0, 0, dw, dh); ctx.restore(); }
+    else ctx.drawImage(im, fi * fw, 0, fw, fh, dx, dy, dw, dh);
+    return true;
+  }
+
   function resize() {
     const ww = window.innerWidth, wh = window.innerHeight;
     const scale = Math.min(ww / VW, wh / VH);
@@ -483,7 +519,7 @@
   //  Rendering
   // ============================================================
   function draw() {
-    drawSky(); drawHills(); drawVillage();
+    drawBackdrop();
     ctx.save(); ctx.translate(-Math.round(camX), 0);
     drawGround(); platforms.forEach(drawPlatform); coins.forEach(drawCoin); pickups.forEach(drawPickup);
     enemies.forEach((e) => e.alive && drawEnemy(e));
@@ -513,6 +549,20 @@
         ctx.fillStyle = b.spread ? "#ff9f1c" : "#fff36b"; ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 1, 0, 7); ctx.fill();
       }
     }
+  }
+
+  function drawBackdrop() {
+    const key = level === 2 ? "bg_level2" : "bg_level1";
+    const im = IMG[key];
+    if (im && im._ok && im.naturalWidth) {
+      const ts = 64, ox = ((camX * 0.3) % ts + ts) % ts, oy = ((frame * 0.15) % ts + ts) % ts;
+      for (let y = -ts; y < VH + ts; y += ts)
+        for (let x = -ts; x < VW + ts; x += ts) ctx.drawImage(im, x - ox, y - oy + ts, ts, ts);
+      // gentle vignette so bright sprites pop
+      const g = ctx.createLinearGradient(0, 0, 0, VH);
+      g.addColorStop(0, "rgba(0,0,0,0.18)"); g.addColorStop(0.4, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,0.22)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+    } else { drawSky(); drawHills(); drawVillage(); }
   }
 
   function drawSky() {
@@ -567,6 +617,10 @@
   }
   function drawCoin(c) {
     if (c.taken) return;
+    if (drawSprite("coin", frame / 4 + (c.x | 0), c.x - 9, c.y - 9, 18, 18, false)) return;
+    drawCoinShapes(c);
+  }
+  function drawCoinShapes(c) {
     const sw = Math.abs(Math.cos(c.t)) * 7 + 1;
     ctx.fillStyle = "#caa31a"; ctx.beginPath(); ctx.ellipse(c.x, c.y, sw + 1, 8, 0, 0, 7); ctx.fill();
     ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.ellipse(c.x, c.y, sw, 7, 0, 0, 7); ctx.fill();
@@ -584,6 +638,33 @@
   function drawPlayer() {
     const p = player;
     if (p.invuln > 0 && Math.floor(frame / 4) % 2 === 0) return;
+    let key, spd = 6;
+    if (p.prone) key = "player_idle";
+    else if (!p.onGround) key = p.vy < 0 ? "player_jump" : "player_fall";
+    else if (Math.abs(p.vx) > 0.4) { key = "player_run"; spd = 3; }
+    else key = "player_idle";
+    const dw = 38, dh = 38;
+    const dx = p.x + p.w / 2 - dw / 2;
+    const dy = p.y + p.h - dh + 5 + (p.prone ? 9 : 0);
+    if (drawSprite(key, frame / spd, dx, dy, dw, dh, p.facing < 0)) { drawGunOverlay(); return; }
+    drawPlayerShapes();
+  }
+
+  // small code-drawn gun barrel + muzzle so aim/shooting reads on the sprite
+  function drawGunOverlay() {
+    const p = player, x = Math.round(p.x), y = Math.round(p.y), f = p.facing;
+    ctx.fillStyle = "#2b2f38";
+    let gx, gy, gw = 12, gh = 3;
+    if (input.up && !input.left && !input.right) { gx = x + p.w / 2 - 1; gy = y - 4; gw = 3; gh = 11; }
+    else if (input.up) { gx = f > 0 ? x + 9 : x - 5; gy = y + 2; }
+    else if (input.down && !p.onGround) { gx = f > 0 ? x + 9 : x - 5; gy = y + 18; }
+    else { gx = f > 0 ? x + 9 : x - 7; gy = y + 14; }
+    ctx.fillRect(gx, gy, gw, gh);
+    if (shootCD > (WEAPONS[p.weapon].cd - 3)) { ctx.fillStyle = "#ffe070"; ctx.fillRect(f > 0 ? gx + gw : gx - 3, gy - 1, 3, gh + 2); }
+  }
+
+  function drawPlayerShapes() {
+    const p = player;
     const x = Math.round(p.x), y = Math.round(p.y), f = p.facing;
     const skin = "#f0c090";
     const suit = p.weapon === "spread" ? "#e85d4e" : p.weapon === "flame" ? "#e08a2a" : p.weapon === "rocket" ? "#6a7a3a" : "#2e7d4f";
@@ -609,7 +690,20 @@
     else ctx.fillRect(f > 0 ? x + 11 : x - 6, y + 11, 11, 3);
   }
 
+  const EMAP = { soldier: { key: "enemy_soldier", spd: 3 }, heavy: { key: "enemy_heavy", spd: 4 }, jumper: { key: "enemy_jumper", spd: 3 }, turret: { key: "enemy_turret", spd: 6 }, drone: { key: "enemy_drone", spd: 3 } };
   function drawEnemy(e) {
+    const m = EMAP[e.type], im = m && IMG[m.key];
+    if (m && im && im._ok && im.naturalWidth) {
+      const fw = SPRITES[m.key].fw, fh = im.naturalHeight;
+      const dh = e.h + 12, scale = dh / fh, dw = fw * scale;
+      const dx = e.x + e.w / 2 - dw / 2, dy = e.y + e.h - dh + 3;
+      drawSprite(m.key, frame / m.spd + (e.x | 0), dx, dy, dw, dh, player.x > e.x);
+      if (e.type === "heavy" || e.type === "turret") { ctx.fillStyle = "#ff5a5a"; for (let i = 0; i < Math.min(e.hp, 6); i++) ctx.fillRect(Math.round(dx) + i * 4, Math.round(dy) - 4, 3, 2); }
+      return;
+    }
+    drawEnemyShapes(e);
+  }
+  function drawEnemyShapes(e) {
     const x = Math.round(e.x), y = Math.round(e.y), f = player.x > e.x ? 1 : -1;
     if (e.type === "soldier") {
       ctx.fillStyle = "#7a1f1f"; ctx.fillRect(x + 2, y + 18, 4, 8); ctx.fillRect(x + 8, y + 18, 4, 8);

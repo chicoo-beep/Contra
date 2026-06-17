@@ -1,0 +1,14 @@
+Art assets in this folder are from the "Pixel Adventure" pack by Pixel Frog,
+released under CC0 1.0 (Public Domain).
+
+Source: https://pixelfrog-assets.itch.io/pixel-adventure-1
+Obtained via the public-domain mirror: https://github.com/marpor/PixelAdventure
+
+CC0 places no restrictions on use, but please consider supporting Pixel Frog.
+
+Files used (sliced as horizontal animation strips at draw time):
+  player_*.png   - Ninja Frog (idle/run/jump/fall)
+  enemy_soldier  - Mushroom        enemy_heavy - Angry Pig
+  enemy_jumper   - Chicken         enemy_turret - Plant
+  enemy_drone    - Blue Bird       coin - Cherries
+  bg_level1/2    - Background tiles (Green / Purple)
