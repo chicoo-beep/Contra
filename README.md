@@ -37,6 +37,7 @@ Or just open `index.html` directly in a browser.
 | Aim up / down | Hold ▲ / ▼ | ↑ / ↓ |
 | Jump | JUMP button | `Z` / Space |
 | Fire | FIRE button | `X` |
+| Melee hit | HIT button | `C` |
 | Prone (duck) | Hold ▼ on ground | Hold ↓ |
 
 Hold a direction + ▲ to fire diagonally upward; in mid-air, direction + ▼ fires
@@ -57,6 +58,14 @@ diagonally down.
   and weapon carry over.
 - **Original looping background music** (a synthesized chiptune track per level —
   no copyrighted audio). Toggle with **M**.
+- **Beat-'em-up game feel:** a **melee hit** (HIT / `C`) that knocks enemies
+  flying, **screen shake** and **freeze-frame hit-stop** on big impacts, enemy
+  white-flash + knockback, and a **combo system** (chain kills for a score
+  multiplier with on-screen popups).
+- **Arena wave fights:** the screen locks and a wave of enemies rushes in —
+  clear them to break the barrier and move on.
+- Rockets now produce a real **explosive blast** (big splash + shake); the
+  **flamethrower has much longer range**.
 - 8-direction shooting, running, jumping, and prone.
 - **Four weapons** via colored pickup pods: **RIFLE** (default), **`S`** spread,
   **`F`** flamethrower (rapid short-range stream), **`R`** rocket launcher
