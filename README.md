@@ -37,7 +37,10 @@ Or just open `index.html` directly in a browser.
 | Aim up / down | Hold ▲ / ▼ | ↑ / ↓ |
 | Jump | JUMP button | `Z` / Space |
 | Fire | FIRE button | `X` |
-| Melee hit | HIT button | `C` |
+| Melee hit | HIT button | `C` / right-click |
+| Aim / fire (PC) | — | **Mouse** to aim · **left-click** to fire |
+| Dash | — | `Shift` |
+| Double-jump | tap JUMP again | tap `Z` again in mid-air |
 | Prone (duck) | Hold ▼ on ground | Hold ↓ |
 
 Hold a direction + ▲ to fire diagonally upward; in mid-air, direction + ▼ fires
@@ -52,10 +55,12 @@ diagonally down.
   (idle/run/jump/fall), animated enemies, spinning fruit "coins", and tiled
   scenic backgrounds — with automatic fallback to the original code-drawn art
   while images load.
-- **Two levels** with distinct themes — *Level 1: Jungle Village* (bright day) and
-  *Level 2: Sunset Ruins* (dusk palette, tougher & faster enemies). Beat the
-  first boss to advance; clear the second boss to win. Your score, lives, coins
-  and weapon carry over.
+- **Three levels** with distinct themes — *Jungle Village* (day), *Sunset Ruins*
+  (dusk), and *Midnight Keep* (night) — each ending in a boss. Stats, coins and
+  weapons carry over between levels.
+- **PC controls:** mouse free-aim with click-to-fire, a **dash** (Shift) with
+  i-frames, and a **double-jump**.
+- **Health drops** (enemies sometimes drop a heart) and a **saved high score**.
 - **Original looping background music** (a synthesized chiptune track per level —
   no copyrighted audio). Toggle with **M**.
 - **Beat-'em-up game feel:** a **melee hit** (HIT / `C`) that knocks enemies
