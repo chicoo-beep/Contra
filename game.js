@@ -29,6 +29,7 @@
     enemy_jumper:  { src: "assets/enemy_jumper.png",  fw: 32 },
     enemy_turret:  { src: "assets/enemy_turret.png",  fw: 44 },
     enemy_drone:   { src: "assets/enemy_drone.png",   fw: 32 },
+    enemy_charger: { src: "assets/enemy_charger.png",  fw: 52 },
     coin:          { src: "assets/coin.png",          fw: 32 },
     bg_level1:     { src: "assets/bg_level1.png" },
     bg_level2:     { src: "assets/bg_level2.png" },
@@ -81,16 +82,24 @@
   const input = { left: false, right: false, up: false, down: false, jump: false, fire: false, melee: false, dash: false, jumpPressed: false, dashPressed: false };
   const mouse = { x: VW / 2, y: VH / 2, active: false };
   const keyMap = {
-    ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down",
+    ArrowLeft: "left", ArrowRight: "right", ArrowDown: "down",
     KeyA: "left", KeyD: "right", KeyW: "up", KeyS: "down",
-    KeyZ: "jump", Space: "jump", KeyK: "jump", KeyX: "fire", KeyJ: "fire", KeyL: "fire",
+    ArrowUp: "jump", KeyZ: "jump", KeyK: "jump", KeyX: "fire", KeyJ: "fire", KeyL: "fire",
     KeyC: "melee", KeyV: "melee", ShiftLeft: "dash", ShiftRight: "dash"
   };
   window.addEventListener("keydown", (e) => {
+    if (gameState === "shop") {
+      if (e.code === "Digit1") buyItem(0); else if (e.code === "Digit2") buyItem(1);
+      else if (e.code === "Digit3") buyItem(2); else if (e.code === "Digit4") buyItem(3);
+      else if (e.code === "Enter" || e.code === "Space") continueShop();
+      e.preventDefault(); return;
+    }
     if (e.code === "KeyP") { togglePause(); return; }
     if (e.code === "KeyM") { toggleMusic(); return; }
     if (e.code === "KeyG") { toggleGod(); return; }
     if (e.code === "KeyQ") { switchWeapon(); return; }
+    if (e.code === "KeyE") { e.preventDefault(); throwGrenade(); return; }
+    if (e.code === "KeyR") { e.preventDefault(); tryUlt(); return; }
     const a = keyMap[e.code]; if (!a) return; e.preventDefault();
     if (a === "jump" && !input.jump) input.jumpPressed = true;
     if (a === "dash" && !input.dash) input.dashPressed = true;
@@ -343,7 +352,9 @@
   let level, levelW, theme, fireMul, bannerT, pendingAdvance, godMode = false;
   // juice / beat-'em-up state
   let shake = 0, hitStop = 0, meleeCD = 0, combo = 0, comboTimer = 0, meleeFx = null;
-  let popups = [], blasts = [], drops = [];
+  let popups = [], blasts = [], drops = [], grenades = [];
+  let bonusHpMax = 0, fireRateMul = 1, dashCdBase = 38;   // persistent shop upgrades
+  let ultCharge = 0, grenadeCD = 0, pendingShop = false;
   let hiScore = 0;
   try { hiScore = parseInt(localStorage.getItem("contra_hi") || "0", 10) || 0; } catch (e) {}
   function saveHi() { if (score > hiScore) { hiScore = score; try { localStorage.setItem("contra_hi", String(hiScore)); } catch (e) {} } }
@@ -356,9 +367,10 @@
   function dist(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
 
   function makePlayer() {
+    const hpMax = 4 + bonusHpMax;
     return { x: 40, y: GROUND_Y - 30, w: 14, h: 30, vx: 0, vy: 0, facing: 1,
-      onGround: false, prone: false, weapon: "default", owned: ["default"], invuln: 0, hp: 4, hpMax: 4,
-      jumps: 2, dashCD: 0, dashTimer: 0 };
+      onGround: false, prone: false, weapon: "default", owned: ["default"], invuln: 0, hp: hpMax, hpMax: hpMax,
+      jumps: 2, dashCD: 0, dashTimer: 0, grenades: 3 };
   }
   function switchWeapon() {
     if (!player || player.owned.length < 2) return;
@@ -376,7 +388,8 @@
   function makeJumper(x)  { return { type: "jumper", x, y: GROUND_Y - 22, w: 14, h: 22, vx: 0, vy: 0, hp: 2, jumpCD: 30 + Math.random() * 50, alive: true, active: false }; }
   function makeTurret(x, y) { return { type: "turret", x, y, w: 18, h: 16, hp: 3, fireCD: 90 * fireMul, alive: true, active: false }; }
   function makeDrone(x, y) { return { type: "drone", x, y, baseY: y, w: 22, h: 14, hp: 2, fireCD: (80 + Math.random() * 50) * fireMul, t: Math.random() * 6, alive: true, active: false }; }
-  function makeBoss(hp) { return { x: levelW - 150, y: GROUND_Y - 80, w: 56, h: 80, hp, hpMax: hp, fireCD: 70, alive: true, active: false, coreT: 0, pulse: 0 }; }
+  function makeCharger(x) { return { type: "charger", x, y: GROUND_Y - 22, w: 24, h: 22, vx: 0, vy: 0, hp: 3, chargeT: 0, alive: true, active: false }; }
+  function makeBoss(hp) { return { x: levelW - 150, y: GROUND_Y - 84, w: 60, h: 84, hp, hpMax: hp, fireCD: 70, alive: true, active: false, coreT: 0, pulse: 0, phase: 0 }; }
 
   function loadLevel(n) {
     level = n;
@@ -388,19 +401,21 @@
     (L.heavies || []).forEach((x) => enemies.push(makeHeavy(x)));
     (L.jumpers || []).forEach((x) => enemies.push(makeJumper(x)));
     L.turrets.forEach((t) => enemies.push(makeTurret(t[0], t[1])));
-    L.drones.forEach((d) => enemies.push(makeDrone(d[0], d[1])));
+    // ground-only: former flyer positions become charging Rinos
+    L.drones.forEach((d) => enemies.push(makeCharger(d[0])));
     coins = [];
     L.coinSpots.forEach((sx) => { for (let i = 0; i < 5; i++) coins.push({ x: sx + i * 18, y: 150 - Math.sin((i / 4) * Math.PI) * 34, taken: false, t: i }); });
     pickups = L.pickups.map((p) => ({ x: p[0], y: p[1], w: 16, h: 16, kind: p[2], t: 0 }));
     boss = makeBoss(L.bossHp);
     bullets = []; eBullets = []; particles = []; popups = []; blasts = []; drops = []; meleeFx = null;
     arenas = (L.arenas || []).map((a) => ({ x: a.x, count: a.count, types: a.types, triggered: false, done: false }));
-    arenaActive = false; curArena = null; arenaTimer = 0;
+    arenaActive = false; curArena = null; arenaTimer = 0; grenades = []; grenadeCD = 0;
     player.x = 40; player.y = GROUND_Y - 30; player.vx = 0; player.vy = 0; player.prone = false;
-    player.hp = player.hpMax; player.invuln = 100;
+    player.hpMax = 4 + bonusHpMax; player.hp = player.hpMax; player.invuln = 100; player.grenades = 3;
     camX = 0; shootCD = 0; meleeCD = 0; bannerT = 130;
   }
   function resetGame() {
+    bonusHpMax = 0; fireRateMul = 1; dashCdBase = 38; ultCharge = 0; pendingShop = false;
     player = makePlayer();
     score = 0; lives = 10; coinCount = 0; flashT = 0; frame = 0; pendingAdvance = false;
     shake = 0; hitStop = 0; combo = 0; comboTimer = 0;
@@ -444,9 +459,10 @@
       const sp = 6.6; bullets.push({ kind: "bullet", x: mx, y: my, vx: ux * sp, vy: uy * sp, r: 3, dmg: 2, spread: false });
       SFX.shoot();
     }
-    shootCD = WEAPONS[w].cd;
+    shootCD = Math.max(1, Math.round(WEAPONS[w].cd * fireRateMul));
   }
   function enemyShoot(ex, ey, tx, ty, speed) { const ang = Math.atan2(ty - ey, tx - ex); eBullets.push({ x: ex, y: ey, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, r: 3 }); }
+  function bShot(x, y, ang, sp) { return { x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, r: 4 }; }
   function burst(x, y, color, n) {
     for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, s = 1 + Math.random() * 3; particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, life: 18 + Math.random() * 14, color }); }
   }
@@ -458,6 +474,7 @@
     addPopup(e.x + e.w / 2, e.y - 2, combo >= 2 ? "+" + (base * mult) : "+" + base, combo >= 3 ? "#ffd23f" : "#fff", combo >= 4);
     burst(e.x + e.w / 2, e.y + e.h / 2, "#ff8c3f", 18); burst(e.x + e.w / 2, e.y + e.h / 2, "#ffd23f", 8);
     addShake(3); SFX.explode();
+    ultCharge = Math.min(100, ultCharge + 9);
     if (Math.random() < 0.12) drops.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, vy: -2, kind: "heart", t: 0 });
   }
   function hurtEnemy(e, dmg) { if (!e.alive) return; e.hp -= dmg; e.flash = 6; if (e.hp <= 0) { e.alive = false; killReward(e); } else SFX.hit(); }
@@ -466,7 +483,7 @@
     boss.hp -= dmg; boss.pulse = 6; score += Math.ceil(dmg); SFX.bossHit();
     if (boss.hp <= 0) {
       boss.alive = false; burst(boss.x + 28, boss.y + 40, "#ff5a3c", 60); score += 2000; addShake(12); SFX.bossDie();
-      if (level < LAST_LEVEL) pendingAdvance = true;     // defer level switch to end of frame (avoids mid-loop array swap)
+      if (level < LAST_LEVEL) pendingShop = true;        // open the shop at end of frame, then next level
       else { gameState = "win"; saveHi(); SFX.fanfare(); showOverlay("win-screen", "win-score", "SCORE " + score + "   BEST " + Math.max(hiScore, score)); }
     }
   }
@@ -484,7 +501,7 @@
   function spawnEnemyByType(t, x) {
     if (t === "heavy") return makeHeavy(x);
     if (t === "jumper") return makeJumper(x);
-    if (t === "drone") return makeDrone(x, 70 + Math.random() * 30);
+    if (t === "charger" || t === "drone") return makeCharger(x);   // ground-only now
     return makeSoldier(x);
   }
   function triggerArena(a) {
@@ -511,6 +528,56 @@
     if (boss.alive && boss.active && overlap(box, boss)) { hurtBoss(5); hit = true; }
     meleeFx = { x: p.facing > 0 ? p.x + p.w : p.x, y: p.y + p.h / 2 - 4, t: 8, f: p.facing };
     if (hit) { hitStop = Math.max(hitStop, 4); addShake(6); }
+  }
+  function throwGrenade() {
+    if (gameState !== "playing" || player.grenades <= 0 || grenadeCD > 0) return;
+    player.grenades--; grenadeCD = 16;
+    grenades.push({ x: player.x + player.w / 2, y: player.y + 6, vx: player.facing * 4.4 + player.vx * 0.4, vy: -5.4, fuse: 72 });
+    SFX.rocket();
+  }
+  function tryUlt() {
+    if (gameState !== "playing" || ultCharge < 100) return;
+    ultCharge = 0; player.invuln = Math.max(player.invuln, 72);
+    addShake(16); hitStop = Math.max(hitStop, 5); flashT = 14; SFX.bossDie();
+    for (let i = 0; i < 5; i++) blasts.push({ x: camX + 60 + i * 90, y: 70 + (i % 2) * 80, r: 8, max: 95, t: 18 });
+    for (const e of enemies) { if (!e.alive) continue; if (e.x > camX - 40 && e.x < camX + VW + 40) { e.kbx = (e.x < camX + VW / 2 ? -1 : 1) * 8; e.vy = -4; hurtEnemy(e, 8); } }
+    if (boss.alive && boss.active) hurtBoss(22);
+    addPopup(camX + VW / 2, 70, "ULTIMATE!", "#ff4060", true);
+  }
+  // ---- shop between levels ----
+  const SHOP = [
+    { name: "+1 Max Health", cost: 80,  buy: () => { bonusHpMax++; player.hpMax++; player.hp = player.hpMax; } },
+    { name: "Faster Fire",   cost: 120, buy: () => { fireRateMul = Math.max(0.45, fireRateMul - 0.12); } },
+    { name: "Faster Dash",   cost: 100, buy: () => { dashCdBase = Math.max(14, dashCdBase - 6); } },
+    { name: "+1 Life",       cost: 150, buy: () => { lives++; } }
+  ];
+  function canBuy(i) {
+    if (SHOP[i].name === "Faster Fire" && fireRateMul <= 0.45) return false;
+    if (SHOP[i].name === "Faster Dash" && dashCdBase <= 14) return false;
+    return coinCount >= SHOP[i].cost;
+  }
+  function buyItem(i) {
+    if (gameState !== "shop" || !SHOP[i]) return;
+    if (!canBuy(i)) { SFX.hit(); return; }
+    coinCount -= SHOP[i].cost; SHOP[i].buy(); SFX.power(); refreshShop();
+  }
+  function refreshShop() {
+    const cs = document.getElementById("shop-coins"); if (cs) cs.textContent = coinCount;
+    for (let i = 0; i < SHOP.length; i++) {
+      const el = document.getElementById("shop-" + i); if (!el) continue;
+      const maxed = (SHOP[i].name === "Faster Fire" && fireRateMul <= 0.45) || (SHOP[i].name === "Faster Dash" && dashCdBase <= 14);
+      el.querySelector(".si-cost").textContent = maxed ? "MAX" : (SHOP[i].cost + "c");
+      el.classList.toggle("afford", canBuy(i));
+      el.classList.toggle("maxed", maxed);
+    }
+  }
+  function openShop() {
+    gameState = "shop"; refreshShop();
+    document.getElementById("shop-screen").classList.remove("hidden");
+  }
+  function continueShop() {
+    document.getElementById("shop-screen").classList.add("hidden");
+    advanceLevel(); gameState = "playing";
   }
   function playerHit() {
     if (godMode || player.invuln > 0) return;
@@ -555,7 +622,7 @@
     // dash (Shift / DASH): quick burst with brief i-frames
     if (p.dashCD > 0) p.dashCD--;
     if (input.dashPressed && p.dashCD <= 0) {
-      p.dashTimer = 9; p.dashCD = 38; p.vx = p.facing * 9.5; p.vy *= 0.3;
+      p.dashTimer = 9; p.dashCD = dashCdBase; p.vx = p.facing * 9.5; p.vy *= 0.3;
       p.invuln = Math.max(p.invuln, 11); SFX.jump(); addShake(3);
     }
     input.dashPressed = false;
@@ -574,6 +641,7 @@
     if (input.fire && shootCD <= 0) firePlayer();
     if (meleeCD > 0) meleeCD--;
     if (input.melee && meleeCD <= 0) doMelee();
+    if (grenadeCD > 0) grenadeCD--;
 
     const target = p.x - VW * 0.38;
     camX += (target - camX) * 0.12;
@@ -609,8 +677,8 @@
       if (!hit && boss.alive && boss.active && overlap(bb, boss)) { if (b.kind === "rocket") explodeAt(b.x, b.y, 72, b.dmg); else hurtBoss(b.dmg); hit = true; }
       if (hit) bullets.splice(i, 1);
     }
-    // deferred level transition (boss of level 1 cleared)
-    if (pendingAdvance) { pendingAdvance = false; advanceLevel(); return; }
+    // deferred: open shop after a boss is cleared (avoids mid-loop array swap)
+    if (pendingShop) { pendingShop = false; openShop(); return; }
 
     // enemies
     for (const e of enemies) {
@@ -634,6 +702,10 @@
       } else if (e.type === "drone") {
         e.t += 0.05; e.y = e.baseY + Math.sin(e.t) * 16; e.x += (p.x > e.x ? 1 : -1) * 0.5;
         if (--e.fireCD <= 0 && Math.abs(e.x - p.x) < 260) { enemyShoot(e.x + 11, e.y + 12, p.x + 7, p.y + 12, 2.8); e.fireCD = 90 * fireMul; }
+      } else if (e.type === "charger") {
+        e.vy += GRAVITY; e.y += e.vy; if (e.y + e.h >= GROUND_Y) { e.y = GROUND_Y - e.h; e.vy = 0; }
+        e.chargeT++; const dir = p.x > e.x ? 1 : -1;
+        e.x += dir * ((e.chargeT % 90 < 50) ? 0.7 : 2.7);   // bursts of fast charging
       }
       if (overlap(p, e)) playerHit();
     }
@@ -642,10 +714,22 @@
       if (!boss.active && camX > levelW - VW - 30) boss.active = true;
       if (boss.active) {
         boss.coreT += 0.06; if (boss.pulse > 0) boss.pulse--;
+        const frac = boss.hp / boss.hpMax, ph = frac > 0.66 ? 1 : frac > 0.33 ? 2 : 3;
+        if (ph !== boss.phase) {                       // phase transition
+          boss.phase = ph; boss.pulse = 20; boss.fireCD = 28; addShake(11); hitStop = Math.max(hitStop, 3);
+          for (let k = 0; k < ph; k++) { const e = makeSoldier(boss.x - 24 - k * 22); e.active = true; e.arena = false; enemies.push(e); }
+          if (ph > 1) addPopup(boss.x + boss.w / 2, boss.y - 6, "PHASE " + ph + "!", "#ff5a3c", true);
+        }
+        // stalk the player within the final screen
+        const tx = p.x + (p.x < boss.x ? 46 : -46);
+        boss.x += Math.sign(tx - boss.x) * (0.3 + boss.phase * 0.25);
+        boss.x = Math.max(levelW - VW + 16, Math.min(levelW - boss.w - 6, boss.x));
+        boss.y = GROUND_Y - boss.h + Math.sin(boss.coreT * 1.6) * 4;
         if (--boss.fireCD <= 0) {
-          const cx = boss.x + 10, cy = boss.y + boss.h / 2, spread = level >= 2 ? 2 : 1;
-          for (let a = -spread; a <= spread; a++) { const ang = Math.atan2((p.y + 12) - cy, p.x - cx) + a * 0.24; eBullets.push({ x: cx, y: cy, vx: Math.cos(ang) * 3, vy: Math.sin(ang) * 3, r: 4 }); }
-          boss.fireCD = level >= 2 ? 45 : 55;
+          const cx = boss.x + boss.w / 2, cy = boss.y + boss.h / 2, base = Math.atan2((p.y + 12) - cy, p.x - cx);
+          if (boss.phase === 1) { for (let a = -1; a <= 1; a++) eBullets.push(bShot(cx, cy, base + a * 0.22, 3)); boss.fireCD = 50; }
+          else if (boss.phase === 2) { for (let a = -2; a <= 2; a++) eBullets.push(bShot(cx, cy, base + a * 0.2, 3.2)); boss.fireCD = 40; }
+          else { for (let a = -1; a <= 1; a++) eBullets.push(bShot(cx, cy, base + a * 0.16, 3.9)); boss.fireCD = 22; }
         }
         if (overlap(p, boss)) playerHit();
       }
@@ -665,6 +749,14 @@
         if (!player.owned.includes(wname)) player.owned.push(wname);
         player.weapon = wname; score += 50; SFX.power(); burst(pk.x + 8, pk.y + 8, "#3fd0ff", 18);
       }
+    }
+    for (let i = grenades.length - 1; i >= 0; i--) {
+      const g = grenades[i]; g.vy += GRAVITY * 0.85; g.x += g.vx; g.y += g.vy; g.fuse--;
+      if (g.y + 4 >= GROUND_Y) { g.y = GROUND_Y - 4; g.vy *= -0.42; g.vx *= 0.6; }
+      let boom = g.fuse <= 0;
+      if (!boom) for (const e of enemies) { if (e.alive && overlap({ x: g.x - 4, y: g.y - 4, w: 8, h: 8 }, e)) { boom = true; break; } }
+      if (!boom && boss.alive && boss.active && overlap({ x: g.x - 4, y: g.y - 4, w: 8, h: 8 }, boss)) boom = true;
+      if (boom) { explodeAt(g.x, g.y, 66, 12); grenades.splice(i, 1); }
     }
     for (let i = drops.length - 1; i >= 0; i--) {
       const d = drops[i]; d.t += 0.15; d.vy += GRAVITY * 0.6; d.y += d.vy;
@@ -693,6 +785,7 @@
     if (boss.alive) drawBoss();
     drawBullets();
     ctx.fillStyle = "#ff5a5a"; for (const b of eBullets) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill(); }
+    grenades.forEach(drawGrenade);
     drawPlayer();
     if (meleeFx) drawMeleeFx();
     for (const pt of particles) { ctx.globalAlpha = Math.max(0, pt.life / 24); ctx.fillStyle = pt.color; ctx.fillRect(pt.x - 1, pt.y - 1, 3, 3); }
@@ -901,7 +994,7 @@
     ctx.globalAlpha = 1; ctx.textAlign = "left";
   }
 
-  const EMAP = { soldier: { key: "enemy_soldier", spd: 3 }, heavy: { key: "enemy_heavy", spd: 4 }, jumper: { key: "enemy_jumper", spd: 3 }, turret: { key: "enemy_turret", spd: 6 }, drone: { key: "enemy_drone", spd: 3 } };
+  const EMAP = { soldier: { key: "enemy_soldier", spd: 3 }, heavy: { key: "enemy_heavy", spd: 4 }, jumper: { key: "enemy_jumper", spd: 3 }, turret: { key: "enemy_turret", spd: 6 }, drone: { key: "enemy_drone", spd: 3 }, charger: { key: "enemy_charger", spd: 3 } };
   function drawEnemy(e) {
     const m = EMAP[e.type], im = m && IMG[m.key];
     if (m && im && im._ok && im.naturalWidth) {
@@ -952,14 +1045,37 @@
   }
 
   function drawBoss() {
-    const x = Math.round(boss.x), y = Math.round(boss.y);
-    ctx.fillStyle = boss.pulse > 0 ? "#ff7a5c" : "#444b57"; ctx.fillRect(x, y, boss.w, boss.h);
-    ctx.fillStyle = "#2c313b"; ctx.fillRect(x + 4, y + 6, boss.w - 8, boss.h - 12);
-    const cx = x + 12, cy = y + boss.h / 2, r = 9 + Math.sin(boss.coreT) * 2;
-    const cg = ctx.createRadialGradient(cx, cy, 1, cx, cy, r + 3);
-    cg.addColorStop(0, "#fff2a0"); cg.addColorStop(0.5, "#ff8c2a"); cg.addColorStop(1, "rgba(255,60,30,0)");
-    ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(cx, cy, r + 3, 0, 7); ctx.fill();
-    ctx.fillStyle = "#1c2026"; for (let i = 0; i < 5; i++) ctx.fillRect(x + boss.w - 7, y + 8 + i * 14, 3, 3);
+    const x = Math.round(boss.x), y = Math.round(boss.y), w = boss.w, h = boss.h, f = player.x < boss.x ? -1 : 1;
+    const phase = boss.phase || 1;
+    const hull = boss.pulse > 0 ? "#ffd0c0" : (phase === 1 ? "#4a5160" : phase === 2 ? "#5a4250" : "#5a2a2a");
+    const coreCol = phase === 1 ? "#3fd0ff" : phase === 2 ? "#ffb13f" : "#ff3b30";
+    // legs
+    ctx.fillStyle = "#23262e";
+    const lstep = Math.sin(boss.coreT * 3) * 3;
+    ctx.fillRect(x + 8, y + h - 10, 8, 12 + lstep); ctx.fillRect(x + w - 16, y + h - 10, 8, 12 - lstep);
+    // body
+    ctx.fillStyle = hull; ctx.fillRect(x, y, w, h - 6);
+    ctx.fillStyle = "#23262e"; ctx.fillRect(x + 5, y + 8, w - 10, h - 22);
+    // armor plates / damage as HP drops
+    ctx.fillStyle = "#161a20";
+    for (let i = 0; i < phase + 1; i++) ctx.fillRect(x + 8 + i * 6, y + 4, 3, 3);
+    // dome head
+    ctx.fillStyle = hull; ctx.fillRect(x + w / 2 - 12, y - 8, 24, 12);
+    // angry eyes
+    ctx.fillStyle = coreCol; ctx.fillRect(x + w / 2 - 8, y - 4, 5, 3); ctx.fillRect(x + w / 2 + 3, y - 4, 5, 3);
+    // glowing core
+    const cx = x + w / 2, cy = y + h / 2 - 2, r = 11 + Math.sin(boss.coreT) * 2;
+    const cg = ctx.createRadialGradient(cx, cy, 1, cx, cy, r + 4);
+    cg.addColorStop(0, "#ffffff"); cg.addColorStop(0.45, coreCol); cg.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(cx, cy, r + 4, 0, 7); ctx.fill();
+    // cannon facing player
+    ctx.fillStyle = "#15181e"; ctx.fillRect(f < 0 ? x - 8 : x + w - 4, cy - 3, 12, 6);
+  }
+  function drawGrenade(g) {
+    const x = Math.round(g.x), y = Math.round(g.y);
+    ctx.fillStyle = "#2e3a24"; ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
+    ctx.fillStyle = "#5a7a3a"; ctx.fillRect(x - 1, y - 5, 2, 2);
+    if (Math.floor(frame / 4) % 2 === 0) { ctx.fillStyle = "#ffec80"; ctx.fillRect(x - 1, y - 7, 2, 2); }
   }
 
   function drawHUD() {
@@ -981,6 +1097,17 @@
     const wlabel = WEAPONS[player ? player.weapon : "default"].name + (player && player.owned.length > 1 ? " (" + player.owned.length + ")" : "");
     ctx.fillText(wlabel, 86, 24);
     if (godMode) { ctx.fillStyle = "#ffd23f"; ctx.font = "bold 10px Trebuchet MS, sans-serif"; ctx.fillText("★GOD", 150, 24); }
+    // grenades
+    ctx.fillStyle = "#9bd35a"; ctx.font = "bold 10px Trebuchet MS, sans-serif";
+    ctx.fillText("✦x" + (player ? player.grenades : 0), 188, 24);
+    // ultimate charge bar
+    const ux = 230, uw = 86;
+    ctx.fillStyle = "#0c1320"; ctx.fillRect(ux - 1, 6, uw + 2, 8);
+    const ready = ultCharge >= 100;
+    ctx.fillStyle = ready ? (Math.floor(frame / 6) % 2 ? "#ff4060" : "#ffd23f") : "#7a3fd0";
+    ctx.fillRect(ux, 7, uw * (ultCharge / 100), 6);
+    ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1; ctx.strokeRect(ux + 0.5, 6.5, uw, 7);
+    ctx.fillStyle = "#fff"; ctx.font = "bold 8px monospace"; ctx.textAlign = "center"; ctx.fillText(ready ? "ULT READY (R)" : "ULT", ux + uw / 2, 13); ctx.textAlign = "left";
     const coinX = VW - 92;
     ctx.fillStyle = "#caa31a"; ctx.beginPath(); ctx.arc(coinX, 15, 8, 0, 7); ctx.fill();
     ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(coinX, 15, 6, 0, 7); ctx.fill();
@@ -1038,6 +1165,10 @@
   document.getElementById("start-btn").addEventListener("click", startGame);
   document.getElementById("retry-btn").addEventListener("click", startGame);
   document.getElementById("again-btn").addEventListener("click", startGame);
+  document.getElementById("shop-continue").addEventListener("click", continueShop);
+  document.querySelectorAll("#shop-screen .shop-item").forEach((el, i) => bindTap(el, () => buyItem(i)));
+  bindTap(document.getElementById("b-grenade"), throwGrenade);
+  bindTap(document.getElementById("b-ult"), tryUlt);
 
   // ============================================================
   //  Main loop

@@ -56,7 +56,24 @@
   #b-fire { right: 134px; bottom: 67px; background: rgba(255,70,70,0.50);  } /* FIRE */
   #b-jump { right: 0;    bottom: 67px;  background: rgba(80,220,120,0.48); } /* JUMP */
   #b-melee{ right: 134px; bottom: 138px; background: rgba(255,165,40,0.55); } /* MELEE */
+  #b-grenade { right: 150px; bottom: 6px;   background: rgba(120,200,90,0.52); }  /* GRENADE */
+  #b-ult     { right: 150px; bottom: 132px; background: rgba(180,70,210,0.52); }  /* ULTIMATE */
   .act small { font-size: 11px; letter-spacing: 1px; }
+
+  /* shop */
+  #shop-screen .shop-item {
+    display: flex; justify-content: space-between; align-items: center;
+    width: 320px; max-width: 82vw; padding: 9px 16px; margin: 5px 0;
+    border: 2px solid rgba(255,255,255,0.22); border-radius: 10px;
+    background: rgba(255,255,255,0.05); font-weight: bold; color: #aeb8c6;
+    font-size: clamp(13px, 3.6vw, 16px);
+  }
+  #shop-screen .shop-item.afford { border-color: #5fe07a; color: #fff; cursor: pointer; }
+  #shop-screen .shop-item.afford:active { transform: scale(0.98); }
+  #shop-screen .shop-item.maxed { opacity: 0.45; }
+  #shop-screen .si-key { display: inline-block; min-width: 18px; color: #ffd23f; }
+  #shop-screen .si-cost { color: #ffd23f; }
+  #shop-coins { color: #ffd23f; }
 
   /* weapon-switch button (centre bottom) */
   #b-weapon {
@@ -132,6 +149,8 @@
       <div class="ctlbtn act" id="b-jump" data-key="jump"><small>JUMP</small></div>
       <div class="ctlbtn act" id="b-melee" data-key="melee"><small>HIT</small></div>
       <div class="ctlbtn act" id="b-down" data-key="down">▼</div>
+      <div class="ctlbtn act" id="b-grenade"><small>BOMB</small></div>
+      <div class="ctlbtn act" id="b-ult"><small>ULT</small></div>
     </div>
     <div class="ctlbtn ctl" id="b-weapon">⟳<br>WPN</div>
     <div id="god-btn">GOD</div>
@@ -145,10 +164,9 @@
     <div class="help">
       <b>Turn your phone sideways.</b><br>
       <b>◀ ▶</b> move · <b>▲ ▼</b> aim up/down · <b>JUMP</b> · <b>FIRE</b><br>
-      <b>WPN</b> switch weapon · <b>GOD</b> invincibility · <b>HIT</b> melee<br>
-      <b>PC:</b> <b>mouse</b> aim · <b>L-click</b> fire · <b>R-click/C</b> melee · <b>Shift</b> dash · <b>Z</b> double-jump<br>
-      <b>Keys:</b> ←→/WASD move · X fire · Q weapon · G god · M music · P pause<br>
-      Grab <b>S / F / R</b> pods · clear <b>arenas</b> · 3 levels &amp; bosses!
+      <b>Keyboard:</b> <b>←→</b> move · <b>↑</b> jump (double-jump!) · <b>X</b> fire · <b>C</b> melee<br>
+      <b>Shift</b> dash · <b>E</b> bomb · <b>R</b> ultimate · <b>Q</b> weapon · <b>W/S</b> aim · <b>G</b> god · <b>P</b> pause<br>
+      Grab <b>S / F / R</b> pods · clear <b>arenas</b> · spend coins in the <b>shop</b> · 3 levels &amp; bosses!
     </div>
   </div>
 
@@ -162,6 +180,16 @@
     <div class="title" id="win-title">CLEARED!</div>
     <div class="subtitle" id="win-score">SCORE 0</div>
     <button class="btn" id="again-btn">↻ Play Again</button>
+  </div>
+
+  <div id="shop-screen" class="overlay hidden">
+    <div class="title" style="font-size:clamp(28px,9vw,56px)">SHOP</div>
+    <div class="subtitle">Coins: <span id="shop-coins">0</span> &nbsp;·&nbsp; press 1–4 to buy</div>
+    <div class="shop-item" id="shop-0"><span><span class="si-key">1</span> +1 Max Health</span><span class="si-cost">80c</span></div>
+    <div class="shop-item" id="shop-1"><span><span class="si-key">2</span> Faster Fire</span><span class="si-cost">120c</span></div>
+    <div class="shop-item" id="shop-2"><span><span class="si-key">3</span> Faster Dash</span><span class="si-cost">100c</span></div>
+    <div class="shop-item" id="shop-3"><span><span class="si-key">4</span> +1 Life</span><span class="si-cost">150c</span></div>
+    <button class="btn" id="shop-continue" style="margin-top:16px">Continue ▶ (Enter)</button>
   </div>
 
   <div id="rotate-screen">

@@ -33,15 +33,17 @@ Or just open `index.html` directly in a browser.
 
 | Action | Touch | Keyboard |
 | ------ | ----- | -------- |
-| Move / aim | D-pad | Arrow keys (or WASD) |
-| Aim up / down | Hold ▲ / ▼ | ↑ / ↓ |
-| Jump | JUMP button | `Z` / Space |
+| Move | D-pad | `←` `→` (or A/D) |
+| Jump / double-jump | JUMP button | `↑` (tap again in air) |
+| Aim up / down | Hold ▲ / ▼ | `W` / `S` (or hold ↓) |
 | Fire | FIRE button | `X` |
-| Melee hit | HIT button | `C` / right-click |
-| Aim / fire (PC) | — | **Mouse** to aim · **left-click** to fire |
-| Dash | — | `Shift` |
-| Double-jump | tap JUMP again | tap `Z` again in mid-air |
-| Prone (duck) | Hold ▼ on ground | Hold ↓ |
+| Melee hit | HIT button | `C` |
+| Dash (i-frames) | — | `Shift` |
+| Grenade | BOMB button | `E` |
+| Ultimate (when charged) | ULT button | `R` |
+| Switch weapon | ⟳ WPN | `Q` |
+| Shop (between levels) | tap items | keys `1`–`4`, `Enter` to continue |
+| Aim / fire (mouse, optional) | — | **Mouse** aims · **left-click** fires |
 
 Hold a direction + ▲ to fire diagonally upward; in mid-air, direction + ▼ fires
 diagonally down.
@@ -58,8 +60,14 @@ diagonally down.
 - **Three levels** with distinct themes — *Jungle Village* (day), *Sunset Ruins*
   (dusk), and *Midnight Keep* (night) — each ending in a boss. Stats, coins and
   weapons carry over between levels.
-- **PC controls:** mouse free-aim with click-to-fire, a **dash** (Shift) with
-  i-frames, and a **double-jump**.
+- **PC controls:** keyboard-first (jump on `↑`), plus a **dash** (Shift) with
+  i-frames and a **double-jump**. Mouse free-aim is optional.
+- **Grenades** (`E`) and a charge-up **Ultimate** (`R`) that clears the screen.
+- **Coin shop between levels** — spend coins on Max Health, Faster Fire, Faster
+  Dash, or extra Lives.
+- **Multi-phase boss** that stalks you, changes attack pattern each phase, and
+  summons reinforcements.
+- **Ground-only enemies** including fast charging **Rinos**, plus more of them.
 - **Health drops** (enemies sometimes drop a heart) and a **saved high score**.
 - **Original looping background music** (a synthesized chiptune track per level —
   no copyrighted audio). Toggle with **M**.
