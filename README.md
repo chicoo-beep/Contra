@@ -41,6 +41,8 @@ Or just open `index.html` directly in a browser.
 | Dash (i-frames) | — | `Shift` |
 | Grenade | BOMB button | `E` |
 | Ultimate (when charged) | ULT button | `R` |
+| Ride / exit vehicle | RIDE button | `F` (stand on a bike/car) |
+| Air support | AIR button | `T` |
 | Switch weapon | ⟳ WPN | `Q` |
 | Shop (between levels) | tap items | keys `1`–`4`, `Enter` to continue |
 | Aim / fire (mouse, optional) | — | **Mouse** aims · **left-click** fires |
@@ -65,6 +67,13 @@ diagonally down.
 - **Grenades** (`E`) and a charge-up **Ultimate** (`R`) that clears the screen.
 - **Coin shop between levels** — spend coins on Max Health, Faster Fire, Faster
   Dash, or extra Lives.
+- **Rideable weaponized vehicles** (press `F` near one): an original red sci-fi
+  **bike** (fast, rams, twin cannon) and a **flying car** (hover with `↑`/`↓`,
+  side guns). The vehicle soaks hits for you until it's destroyed.
+- **Air support** (`T`): call a jet that strafes the area with bombs (limited
+  uses per level).
+- **Animated "live" backdrops** — a flowing waterfall, twinkling sunset desert,
+  and a neon cyber-night skyline (all original code-drawn art).
 - **Multi-phase boss** that stalks you, changes attack pattern each phase, and
   summons reinforcements.
 - **Ground-only enemies** including fast charging **Rinos**, plus more of them.

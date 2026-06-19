@@ -100,6 +100,8 @@
     if (e.code === "KeyQ") { switchWeapon(); return; }
     if (e.code === "KeyE") { e.preventDefault(); throwGrenade(); return; }
     if (e.code === "KeyR") { e.preventDefault(); tryUlt(); return; }
+    if (e.code === "KeyF") { e.preventDefault(); toggleVehicle(); return; }
+    if (e.code === "KeyT") { e.preventDefault(); callAir(); return; }
     const a = keyMap[e.code]; if (!a) return; e.preventDefault();
     if (a === "jump" && !input.jump) input.jumpPressed = true;
     if (a === "dash" && !input.dash) input.dashPressed = true;
@@ -307,7 +309,8 @@
       drones:   [[600,80],[1000,92],[1400,80],[1800,95],[2200,82],[2600,88],[3000,80],[3400,92],[3800,84]],
       coinSpots:[200,470,760,1020,1300,1560,1820,2120,2420,2700,3000,3300,3560,3820,4080],
       pickups:  [[600,110,"S"],[1500,150,"F"],[2800,150,"R"]],
-      arenas:   [{ x: 1450, count: 7, types: ["soldier","jumper","heavy"] }, { x: 3050, count: 8, types: ["soldier","heavy","jumper","drone"] }]
+      arenas:   [{ x: 1450, count: 7, types: ["soldier","jumper","heavy"] }, { x: 3050, count: 8, types: ["soldier","heavy","jumper","drone"] }],
+      vehicles: [[760, "bike"], [2350, "flycar"]]
     },
     2: {
       w: 4900, name: "SUNSET RUINS", fireMul: 0.72, bossHp: 88,
@@ -323,7 +326,8 @@
       drones:   [[450,80],[1000,90],[1500,80],[1950,95],[2400,82],[2900,88],[3400,80],[3850,92],[4250,84],[2200,70],[3100,72]],
       coinSpots:[250,560,880,1200,1520,1840,2160,2480,2800,3120,3440,3760,4080,4350,4600],
       pickups:  [[520,100,"F"],[2300,110,"R"],[3500,150,"S"]],
-      arenas:   [{ x: 1550, count: 8, types: ["soldier","heavy","jumper"] }, { x: 3300, count: 9, types: ["soldier","heavy","drone","jumper"] }]
+      arenas:   [{ x: 1550, count: 8, types: ["soldier","heavy","jumper"] }, { x: 3300, count: 9, types: ["soldier","heavy","drone","jumper"] }],
+      vehicles: [[700, "bike"], [2500, "flycar"]]
     },
     3: {
       w: 5200, name: "MIDNIGHT KEEP", fireMul: 0.6, bossHp: 120,
@@ -339,7 +343,8 @@
       drones:   [[420,80],[980,90],[1500,78],[1980,92],[2440,80],[2920,86],[3400,78],[3880,90],[4300,82],[2200,66],[3200,70],[4000,68]],
       coinSpots:[260,580,900,1220,1540,1860,2180,2500,2820,3140,3460,3780,4100,4420,4740,4980],
       pickups:  [[520,96,"R"],[2200,108,"F"],[3700,150,"S"]],
-      arenas:   [{ x: 1500, count: 9, types: ["soldier","heavy","jumper","drone"] }, { x: 3000, count: 10, types: ["soldier","heavy","jumper","drone"] }, { x: 4300, count: 11, types: ["heavy","soldier","drone","jumper"] }]
+      arenas:   [{ x: 1500, count: 9, types: ["soldier","heavy","jumper","drone"] }, { x: 3000, count: 10, types: ["soldier","heavy","jumper","drone"] }, { x: 4300, count: 11, types: ["heavy","soldier","drone","jumper"] }],
+      vehicles: [[720, "bike"], [2600, "flycar"], [3900, "bike"]]
     }
   };
   const LAST_LEVEL = 3;
@@ -353,6 +358,7 @@
   // juice / beat-'em-up state
   let shake = 0, hitStop = 0, meleeCD = 0, combo = 0, comboTimer = 0, meleeFx = null;
   let popups = [], blasts = [], drops = [], grenades = [];
+  let vehicleParked = [], airJet = null;
   let bonusHpMax = 0, fireRateMul = 1, dashCdBase = 38;   // persistent shop upgrades
   let ultCharge = 0, grenadeCD = 0, pendingShop = false;
   let hiScore = 0;
@@ -362,6 +368,9 @@
   function addShake(n) { if (n > shake) shake = n; }
   function addPopup(x, y, text, color, big) { popups.push({ x, y, text, color: color || "#fff", t: 46, vy: -0.7, big: !!big }); }
 
+  const STARS = [];
+  for (let i = 0; i < 60; i++) STARS.push({ x: Math.random() * VW * 1.2, y: Math.random() * 160, p: Math.random() * 6.28, s: Math.random() < 0.25 ? 2 : 1 });
+
   function rect(x, y, w, h) { return { x, y, w, h }; }
   function overlap(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
   function dist(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
@@ -370,8 +379,9 @@
     const hpMax = 4 + bonusHpMax;
     return { x: 40, y: GROUND_Y - 30, w: 14, h: 30, vx: 0, vy: 0, facing: 1,
       onGround: false, prone: false, weapon: "default", owned: ["default"], invuln: 0, hp: hpMax, hpMax: hpMax,
-      jumps: 2, dashCD: 0, dashTimer: 0, grenades: 3 };
+      jumps: 2, dashCD: 0, dashTimer: 0, grenades: 3, airstrikes: 2, vehicle: null };
   }
+  function vehSize(t) { return t === "flycar" ? { w: 48, h: 24 } : { w: 44, h: 26 }; }
   function switchWeapon() {
     if (!player || player.owned.length < 2) return;
     const i = player.owned.indexOf(player.weapon);
@@ -409,9 +419,11 @@
     boss = makeBoss(L.bossHp);
     bullets = []; eBullets = []; particles = []; popups = []; blasts = []; drops = []; meleeFx = null;
     arenas = (L.arenas || []).map((a) => ({ x: a.x, count: a.count, types: a.types, triggered: false, done: false }));
-    arenaActive = false; curArena = null; arenaTimer = 0; grenades = []; grenadeCD = 0;
+    arenaActive = false; curArena = null; arenaTimer = 0; grenades = []; grenadeCD = 0; airJet = null;
+    vehicleParked = (L.vehicles || []).map((v) => { const s = vehSize(v[1]); return { type: v[1], x: v[0], y: v[1] === "flycar" ? 150 : GROUND_Y - s.h, w: s.w, h: s.h, hp: v[1] === "bike" ? 6 : 5, hpMax: v[1] === "bike" ? 6 : 5 }; });
     player.x = 40; player.y = GROUND_Y - 30; player.vx = 0; player.vy = 0; player.prone = false;
-    player.hpMax = 4 + bonusHpMax; player.hp = player.hpMax; player.invuln = 100; player.grenades = 3;
+    player.vehicle = null; player.w = 14; player.h = 30;
+    player.hpMax = 4 + bonusHpMax; player.hp = player.hpMax; player.invuln = 100; player.grenades = 3; player.airstrikes = 2;
     camX = 0; shootCD = 0; meleeCD = 0; bannerT = 130;
   }
   function resetGame() {
@@ -544,6 +556,82 @@
     if (boss.alive && boss.active) hurtBoss(22);
     addPopup(camX + VW / 2, 70, "ULTIMATE!", "#ff4060", true);
   }
+  // ---- vehicles (rideable, weaponized) ----
+  function toggleVehicle() {
+    if (gameState !== "playing") return;
+    if (player.vehicle) { dismountVehicle(false); return; }
+    for (const v of vehicleParked) {
+      if (overlap(player, { x: v.x - 18, y: v.y - 18, w: v.w + 36, h: v.h + 36 })) { mountVehicle(v); return; }
+    }
+  }
+  function mountVehicle(v) {
+    player.vehicle = { type: v.type, hp: v.hp, hpMax: v.hpMax };
+    vehicleParked.splice(vehicleParked.indexOf(v), 1);
+    player.w = v.w; player.h = v.h; player.prone = false;
+    player.y = v.type === "flycar" ? v.y : GROUND_Y - v.h; player.x = v.x; player.vy = 0;
+    player.invuln = Math.max(player.invuln, 24);
+    SFX.power(); addShake(5); addPopup(player.x + 10, player.y - 8, v.type === "bike" ? "RIDE!" : "FLY!", "#ffd23f", true);
+  }
+  function dismountVehicle(destroyed) {
+    const v = player.vehicle; if (!v) return;
+    const cx = player.x + player.w / 2, cy = player.y + player.h / 2;
+    if (destroyed) { explodeAt(cx, cy, 52, 6); }
+    else { const s = vehSize(v.type); vehicleParked.push({ type: v.type, x: player.x, y: v.type === "flycar" ? player.y : GROUND_Y - s.h, w: s.w, h: s.h, hp: v.hp, hpMax: v.hpMax }); }
+    player.vehicle = null; player.w = 14; player.h = 30;
+    if (player.y > GROUND_Y - 30) player.y = GROUND_Y - 30;
+    player.vy = 0; player.invuln = Math.max(player.invuln, destroyed ? 90 : 22);
+    SFX.jump();
+  }
+  function updateMounted(p) {
+    const v = p.vehicle, ACC = 1.8, MAXV = v.type === "bike" ? 6.6 : 5.2;
+    if (input.left) { p.vx -= ACC; if (!mouse.active) p.facing = -1; }
+    if (input.right) { p.vx += ACC; if (!mouse.active) p.facing = 1; }
+    if (!input.left && !input.right) p.vx *= 0.85;
+    p.vx = Math.max(-MAXV, Math.min(MAXV, p.vx));
+    if (v.type === "flycar") {
+      if (input.jump) p.vy -= 0.65; if (input.down) p.vy += 0.6;
+      if (!input.jump && !input.down) p.vy *= 0.86;
+      p.vy = Math.max(-4.6, Math.min(4.6, p.vy));
+      p.x += p.vx; p.y += p.vy; p.onGround = false;
+      if (p.y < 16) { p.y = 16; p.vy = 0; }
+      if (p.y > GROUND_Y - p.h) { p.y = GROUND_Y - p.h; p.vy = 0; }
+    } else {
+      if (input.jumpPressed && p.onGround) { p.vy = -10; p.onGround = false; SFX.jump(); }
+      p.vy += GRAVITY; if (p.vy > 12) p.vy = 12;
+      p.x += p.vx; p.y += p.vy; p.onGround = false;
+      if (p.y + p.h >= GROUND_Y) { p.y = GROUND_Y - p.h; p.vy = 0; p.onGround = true; }
+    }
+    input.jumpPressed = false; input.dashPressed = false;
+    if (p.x < 0) p.x = 0; if (p.x > levelW - p.w) p.x = levelW - p.w;
+    if (Math.abs(p.vx) > 1.5) ramEnemies(p);
+    if (Math.abs(p.vx) > 4 || Math.random() < 0.4) burst(p.x + (p.facing > 0 ? 0 : p.w), p.y + p.h - 3, "#ffb060", 1);
+  }
+  function ramEnemies(p) {
+    for (const e of enemies) { if (!e.alive) continue; if (overlap(p, e)) { e.kbx = Math.sign(p.vx) * 8; e.vy = -3.2; e.flash = 6; hurtEnemy(e, 3); addShake(3); } }
+    if (boss.alive && boss.active && overlap(p, boss)) hurtBoss(2);
+  }
+  function fireVehicle(p) {
+    const sp = 8.2, f = p.facing, mx = p.x + (f > 0 ? p.w : 0);
+    bullets.push({ kind: "bullet", x: mx, y: p.y + p.h * 0.35, vx: f * sp, vy: 0, r: 4, dmg: 4, spread: false, big: true });
+    bullets.push({ kind: "bullet", x: mx, y: p.y + p.h * 0.62, vx: f * sp, vy: 0, r: 4, dmg: 4, spread: false, big: true });
+    shootCD = 5; SFX.shoot();
+  }
+  // ---- air support ----
+  function callAir() {
+    if (gameState !== "playing" || airJet || player.airstrikes <= 0) return;
+    player.airstrikes--;
+    airJet = { x: camX - 70, y: 38, drop: 10, bombs: 8, dir: 1 };
+    SFX.rocket(); addPopup(camX + VW / 2, 50, "AIR SUPPORT INBOUND!", "#9fd3ff", true);
+  }
+  function updateAir() {
+    if (!airJet) return;
+    airJet.x += 6.5;
+    if (--airJet.drop <= 0 && airJet.bombs > 0 && airJet.x > camX + 20 && airJet.x < camX + VW - 20) {
+      grenades.push({ x: airJet.x, y: airJet.y + 10, vx: 1.5, vy: 1, fuse: 200, gnd: true });
+      airJet.bombs--; airJet.drop = 13;
+    }
+    if (airJet.x > camX + VW + 90) airJet = null;
+  }
   // ---- shop between levels ----
   const SHOP = [
     { name: "+1 Max Health", cost: 80,  buy: () => { bonusHpMax++; player.hpMax++; player.hp = player.hpMax; } },
@@ -581,6 +669,12 @@
   }
   function playerHit() {
     if (godMode || player.invuln > 0) return;
+    if (player.vehicle) {   // vehicle soaks the hit
+      player.vehicle.hp--; player.invuln = 26; addShake(6); SFX.hit();
+      burst(player.x + player.w / 2, player.y + player.h / 2, "#ffd23f", 14);
+      if (player.vehicle.hp <= 0) dismountVehicle(true);
+      return;
+    }
     player.hp--; flashT = 8; addShake(7); hitStop = Math.max(hitStop, 2); combo = 0; comboTimer = 0; SFX.hurt(); burst(player.x + 7, player.y + 15, "#ff5050", 20);
     if (player.hp <= 0) {
       lives--;
@@ -607,6 +701,7 @@
     const p = player;
     if (p.invuln > 0) p.invuln--;
 
+    if (p.vehicle) { updateMounted(p); } else {
     const ACC = 1.0, MAXV = 3.6, FRICT = 0.78;
     p.prone = input.down && p.onGround && !(input.left || input.right);
     if (input.left && p.dashTimer <= 0) { p.vx -= ACC; if (!mouse.active) p.facing = -1; }
@@ -637,11 +732,13 @@
       if (p.vy >= 0 && wasAbove && p.x + p.w > pl.x && p.x < pl.x + pl.w && p.y + p.h >= pl.y && p.y + p.h <= pl.y + pl.h + 12) { p.y = pl.y - p.h; p.vy = 0; p.onGround = true; }
     }
     if (p.onGround) p.jumps = 2;
+    }
     if (shootCD > 0) shootCD--;
-    if (input.fire && shootCD <= 0) firePlayer();
+    if (input.fire && shootCD <= 0) { if (p.vehicle) fireVehicle(p); else firePlayer(); }
     if (meleeCD > 0) meleeCD--;
-    if (input.melee && meleeCD <= 0) doMelee();
+    if (input.melee && meleeCD <= 0 && !p.vehicle) doMelee();
     if (grenadeCD > 0) grenadeCD--;
+    updateAir();
 
     const target = p.x - VW * 0.38;
     camX += (target - camX) * 0.12;
@@ -751,9 +848,9 @@
       }
     }
     for (let i = grenades.length - 1; i >= 0; i--) {
-      const g = grenades[i]; g.vy += GRAVITY * 0.85; g.x += g.vx; g.y += g.vy; g.fuse--;
-      if (g.y + 4 >= GROUND_Y) { g.y = GROUND_Y - 4; g.vy *= -0.42; g.vx *= 0.6; }
+      const g = grenades[i]; g.vy += GRAVITY * (g.gnd ? 0.5 : 0.85); g.x += g.vx; g.y += g.vy; g.fuse--;
       let boom = g.fuse <= 0;
+      if (g.y + 4 >= GROUND_Y) { if (g.gnd) boom = true; else { g.y = GROUND_Y - 4; g.vy *= -0.42; g.vx *= 0.6; } }
       if (!boom) for (const e of enemies) { if (e.alive && overlap({ x: g.x - 4, y: g.y - 4, w: 8, h: 8 }, e)) { boom = true; break; } }
       if (!boom && boss.alive && boss.active && overlap({ x: g.x - 4, y: g.y - 4, w: 8, h: 8 }, boss)) boom = true;
       if (boom) { explodeAt(g.x, g.y, 66, 12); grenades.splice(i, 1); }
@@ -781,6 +878,8 @@
     ctx.save(); ctx.translate(-Math.round(camX) + Math.round(sx), Math.round(sy));
     if (arenaActive) drawArenaWalls();
     drawGround(); platforms.forEach(drawPlatform); coins.forEach(drawCoin); pickups.forEach(drawPickup); drops.forEach(drawDrop);
+    vehicleParked.forEach((v) => drawVehicleAt(v.type, v.x, v.y, v.w, v.h, 1, v.hp, v.hpMax, false));
+    drawAirJet();
     enemies.forEach((e) => e.alive && drawEnemy(e));
     if (boss.alive) drawBoss();
     drawBullets();
@@ -816,17 +915,95 @@
   }
 
   function drawBackdrop() {
-    const key = "bg_level" + level;
-    const im = IMG[key];
-    if (im && im._ok && im.naturalWidth) {
-      const ts = 64, ox = ((camX * 0.3) % ts + ts) % ts, oy = ((frame * 0.15) % ts + ts) % ts;
-      for (let y = -ts; y < VH + ts; y += ts)
-        for (let x = -ts; x < VW + ts; x += ts) ctx.drawImage(im, x - ox, y - oy + ts, ts, ts);
-      // gentle vignette so bright sprites pop
-      const g = ctx.createLinearGradient(0, 0, 0, VH);
-      g.addColorStop(0, "rgba(0,0,0,0.18)"); g.addColorStop(0.4, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,0.22)");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
-    } else { drawSky(); drawHills(); drawVillage(); }
+    if (level === 2) drawWaterfallScene();
+    else if (level === 3) drawCyberScene();
+    else drawDesertScene();
+  }
+  function skyGrad(c0, c1, c2) {
+    const g = ctx.createLinearGradient(0, 0, 0, VH);
+    g.addColorStop(0, c0); g.addColorStop(0.5, c1); g.addColorStop(1, c2);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+  }
+  function drawStars(maxY, n) {
+    for (let i = 0; i < n; i++) {
+      const s = STARS[i], tw = 0.5 + 0.5 * Math.sin(frame * 0.05 + s.p);
+      if (s.y > maxY) continue;
+      ctx.globalAlpha = 0.3 + tw * 0.7; ctx.fillStyle = "#fff";
+      ctx.fillRect((s.x - camX * 0.05) % VW, s.y, s.s, s.s);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function mesa(x, baseY, w, h) {
+    ctx.beginPath(); ctx.moveTo(x, baseY); ctx.lineTo(x + 3, baseY - h);
+    ctx.lineTo(x + w - 3, baseY - h); ctx.lineTo(x + w, baseY); ctx.closePath(); ctx.fill();
+  }
+  function drawDesertScene() {
+    skyGrad("#1a1c47", "#7a3f6e", "#e8895f");
+    drawStars(150, 40);
+    // glowing sun near horizon
+    const sx = 240 - camX * 0.04, sy = 150, pr = 30 + Math.sin(frame * 0.04) * 2;
+    let rg = ctx.createRadialGradient(sx, sy, 4, sx, sy, pr + 30);
+    rg.addColorStop(0, "#fff6d8"); rg.addColorStop(0.4, "#ffd07a"); rg.addColorStop(1, "rgba(255,120,90,0)");
+    ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(sx, sy, pr + 30, 0, 7); ctx.fill();
+    ctx.fillStyle = "#fff3d0"; ctx.beginPath(); ctx.arc(sx, sy, pr, 0, 7); ctx.fill();
+    // mesas (parallax)
+    ctx.fillStyle = "#7a3b34"; let o = (camX * 0.25) % 360;
+    for (let i = -1; i < 3; i++) { mesa(i * 360 - o + 40, 175, 70, 70); mesa(i * 360 - o + 250, 175, 50, 45); }
+    ctx.fillStyle = "#5a2a26"; o = (camX * 0.45) % 300;
+    for (let i = -1; i < 4; i++) mesa(i * 300 - o + 120, 180, 90, 40);
+  }
+  function drawWaterfallScene() {
+    skyGrad("#274a6e", "#3f7fa0", "#9fd0c0");
+    // cliffs framing a gap
+    ctx.fillStyle = "#26432f"; let o = (camX * 0.3) % 420;
+    for (let i = -1; i < 3; i++) {
+      const bx = i * 420 - o;
+      ctx.fillRect(bx, 0, 90, VH); ctx.fillRect(bx + 300, 0, 120, VH);
+      ctx.fillStyle = "#34553c"; ctx.fillRect(bx + 70, 0, 24, VH); ctx.fillStyle = "#26432f";
+    }
+    // flowing waterfall in the gap (animated)
+    const wx = 150 - (camX * 0.3) % 420 + 420, ww = 150;
+    drawWaterfall(wx, ww);
+    drawWaterfall(wx - 420, ww); drawWaterfall(wx + 420, ww);
+  }
+  function drawWaterfall(wx, ww) {
+    ctx.fillStyle = "#bfe6f5"; ctx.fillRect(wx, 0, ww, 200);
+    // falling streaks scroll downward
+    for (let i = 0; i < 22; i++) {
+      const sx = wx + 6 + (i * 6.7) % ww;
+      const off = (frame * 6 + i * 53) % 60;
+      ctx.fillStyle = i % 3 ? "#ffffff" : "#dff3ff";
+      ctx.globalAlpha = 0.8; ctx.fillRect(sx, off - 60 + ((i * 37) % 200), 2, 22); ctx.globalAlpha = 1;
+    }
+    // misty pool glow at base
+    ctx.fillStyle = "rgba(220,245,255," + (0.3 + 0.15 * Math.sin(frame * 0.1)) + ")";
+    ctx.fillRect(wx - 6, 188, ww + 12, 18);
+  }
+  function drawCyberScene() {
+    skyGrad("#241043", "#7a2f6e", "#e06a3c");
+    drawStars(140, 40);
+    // moon
+    const mx = 360 - camX * 0.03; ctx.fillStyle = "#ffe6c0"; ctx.beginPath(); ctx.arc(mx, 70, 24, 0, 7); ctx.fill();
+    ctx.fillStyle = "#e8c89a"; ctx.beginPath(); ctx.arc(mx + 8, 64, 5, 0, 7); ctx.arc(mx - 6, 78, 4, 0, 7); ctx.fill();
+    // drifting airship
+    const ax = (frame * 0.3) % (VW + 120) - 60;
+    ctx.fillStyle = "#2a2f44"; ctx.beginPath(); ctx.ellipse(ax, 50, 22, 7, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = "#ffcf6a"; ctx.fillRect(ax - 14, 50, 2, 2); ctx.fillRect(ax + 10, 49, 2, 2);
+    // neon city skyline (parallax, flickering windows)
+    drawSkyline((camX * 0.25), "#1a1430", 150, 46);
+    drawSkyline((camX * 0.5), "#120e22", 168, 70);
+  }
+  function drawSkyline(off, col, baseY, maxH) {
+    off = off % 80; ctx.fillStyle = col;
+    for (let i = -1; i < 9; i++) {
+      const bx = i * 80 - off + ((i * 53) % 30), bw = 34 + (i * 17) % 26, bh = maxH - (i * 29) % 40;
+      ctx.fillStyle = col; ctx.fillRect(bx, baseY - bh, bw, bh + (VH - baseY));
+      // neon windows
+      for (let wy = baseY - bh + 6; wy < VH; wy += 10)
+        for (let wx2 = bx + 4; wx2 < bx + bw - 3; wx2 += 8) {
+          if ((((wx2 * 13 + wy * 7 + (i * 31)) % 5) === 0) ^ (Math.floor(frame / 30 + wx2) % 7 === 0)) { ctx.fillStyle = (wx2 + wy) % 3 ? "#ff5aa0" : "#5af0ff"; ctx.fillRect(wx2, wy, 2, 3); ctx.fillStyle = col; }
+        }
+    }
   }
 
   function drawSky() {
@@ -899,9 +1076,60 @@
     ctx.fillStyle = "#ffd23f"; ctx.font = "bold 12px monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(pk.kind, pk.x + 8, y + 9);
   }
 
+  function drawVehicleAt(type, x, y, w, h, f, hp, hpMax, mounted) {
+    x = Math.round(x); y = Math.round(y);
+    if (type === "bike") {
+      // wheels
+      ctx.fillStyle = "#15171c"; ctx.beginPath(); ctx.arc(x + 9, y + h - 4, 6, 0, 7); ctx.arc(x + w - 9, y + h - 4, 6, 0, 7); ctx.fill();
+      ctx.fillStyle = "#2a2f3a"; ctx.beginPath(); ctx.arc(x + 9, y + h - 4, 2.5, 0, 7); ctx.arc(x + w - 9, y + h - 4, 2.5, 0, 7); ctx.fill();
+      // sleek red body
+      ctx.fillStyle = "#d8202a"; ctx.beginPath();
+      ctx.moveTo(x + 2, y + h - 8); ctx.lineTo(x + w - 4, y + h - 10); ctx.lineTo(x + w, y + 6); ctx.lineTo(x + w - 16, y + 4); ctx.lineTo(x + 8, y + 8); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#ff5a4a"; ctx.fillRect(x + 12, y + 6, w - 22, 3);
+      ctx.fillStyle = "#7a0f15"; ctx.fillRect(x + 4, y + h - 9, w - 8, 3);
+      // neon underglow + headlight
+      ctx.fillStyle = "rgba(80,200,255,0.5)"; ctx.fillRect(x + 6, y + h - 2, w - 12, 2);
+      ctx.fillStyle = "#bfe9ff"; ctx.fillRect(f > 0 ? x + w - 3 : x, y + 7, 3, 3);
+      // forward cannon
+      ctx.fillStyle = "#cfd6e0"; ctx.fillRect(f > 0 ? x + w - 2 : x - 8, y + 9, 10, 3);
+    } else { // flycar
+      ctx.fillStyle = "#2b3550"; ctx.beginPath();
+      ctx.moveTo(x, y + h - 6); ctx.lineTo(x + w, y + h - 8); ctx.lineTo(x + w - 6, y + 4); ctx.lineTo(x + 10, y + 3); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#3f5a8c"; ctx.fillRect(x + 6, y + 5, w - 16, 6);
+      ctx.fillStyle = "#9fe0ff"; ctx.fillRect(x + 12, y + 2, 16, 6);             // canopy
+      ctx.fillStyle = "#11151f"; ctx.fillRect(x + 2, y + h - 6, w - 4, 4);
+      // side guns
+      ctx.fillStyle = "#cfd6e0"; ctx.fillRect(f > 0 ? x + w - 2 : x - 8, y + 9, 10, 3);
+      // thruster flames
+      const fl = (frame % 4 < 2) ? 7 : 4;
+      ctx.fillStyle = "#ffb13f"; ctx.fillRect(f > 0 ? x - fl : x + w, y + h - 7, fl, 4);
+      ctx.fillStyle = "#fff1b0"; ctx.fillRect(f > 0 ? x - fl / 2 : x + w, y + h - 6, fl / 2, 2);
+    }
+    if (mounted) {   // rider
+      ctx.fillStyle = "#2e7d4f"; ctx.fillRect(x + w / 2 - 3, y - 6, 7, 8);
+      ctx.fillStyle = "#f0c090"; ctx.fillRect(x + w / 2 - 2, y - 11, 5, 5);
+      ctx.fillStyle = "#c0392b"; ctx.fillRect(x + w / 2 - 3, y - 12, 7, 2);
+    } else {         // parked: "RIDE (F)" prompt when player is near
+      if (Math.abs((player.x + player.w / 2) - (x + w / 2)) < 60) {
+        ctx.fillStyle = "#ffd23f"; ctx.font = "bold 9px Trebuchet MS, sans-serif"; ctx.textAlign = "center";
+        ctx.fillText(Math.floor(frame / 20) % 2 ? "RIDE (F)" : "▲ RIDE", x + w / 2, y - 16); ctx.textAlign = "left";
+      }
+    }
+    // hp pips
+    if (hpMax) { ctx.fillStyle = "#5fe07a"; for (let i = 0; i < hp; i++) ctx.fillRect(x + 2 + i * 4, y - (mounted ? 16 : 4), 3, 2); }
+  }
+  function drawAirJet() {
+    if (!airJet) return;
+    const x = Math.round(airJet.x), y = airJet.y;
+    ctx.fillStyle = "#4a5568"; ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x + 30, y); ctx.lineTo(x + 30, y + 8); ctx.lineTo(x, y + 8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#6b7688"; ctx.fillRect(x + 6, y - 3, 12, 4);            // tail fin
+    ctx.fillStyle = "#9fe0ff"; ctx.fillRect(x + 24, y + 2, 4, 3);           // cockpit
+    ctx.fillStyle = "#ffb13f"; ctx.fillRect(x - 5, y + 4, 5, 3);            // exhaust
+  }
   function drawPlayer() {
     const p = player;
     if (p.invuln > 0 && Math.floor(frame / 4) % 2 === 0) return;
+    if (p.vehicle) { drawVehicleAt(p.vehicle.type, p.x, p.y, p.w, p.h, p.facing, p.vehicle.hp, p.vehicle.hpMax, true); return; }
     let key, spd = 6;
     if (p.prone) key = "player_idle";
     else if (!p.onGround) key = p.vy < 0 ? "player_jump" : "player_fall";
@@ -1097,9 +1325,10 @@
     const wlabel = WEAPONS[player ? player.weapon : "default"].name + (player && player.owned.length > 1 ? " (" + player.owned.length + ")" : "");
     ctx.fillText(wlabel, 86, 24);
     if (godMode) { ctx.fillStyle = "#ffd23f"; ctx.font = "bold 10px Trebuchet MS, sans-serif"; ctx.fillText("★GOD", 150, 24); }
-    // grenades
+    // grenades + airstrikes
     ctx.fillStyle = "#9bd35a"; ctx.font = "bold 10px Trebuchet MS, sans-serif";
-    ctx.fillText("✦x" + (player ? player.grenades : 0), 188, 24);
+    ctx.fillText("✦x" + (player ? player.grenades : 0), 184, 24);
+    ctx.fillStyle = "#9fd3ff"; ctx.fillText("✈x" + (player ? player.airstrikes : 0), 210, 24);
     // ultimate charge bar
     const ux = 230, uw = 86;
     ctx.fillStyle = "#0c1320"; ctx.fillRect(ux - 1, 6, uw + 2, 8);
@@ -1169,6 +1398,8 @@
   document.querySelectorAll("#shop-screen .shop-item").forEach((el, i) => bindTap(el, () => buyItem(i)));
   bindTap(document.getElementById("b-grenade"), throwGrenade);
   bindTap(document.getElementById("b-ult"), tryUlt);
+  bindTap(document.getElementById("b-ride"), toggleVehicle);
+  bindTap(document.getElementById("b-air"), callAir);
 
   // ============================================================
   //  Main loop

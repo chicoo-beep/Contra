@@ -97,6 +97,16 @@
   .touch #pause-btn, .show-pause #pause-btn,
   .touch #god-btn,   .show-pause #god-btn { display: flex; }
 
+  /* left-side extra buttons (ride / air support) */
+  #b-ride, #b-air {
+    pointer-events: auto; position: absolute; left: 10px; width: 50px; height: 44px;
+    border-radius: 10px; border: 2px solid rgba(255,255,255,0.45); color: #fff;
+    font-weight: bold; font-size: 11px; display: none; align-items: center; justify-content: center; z-index: 12;
+  }
+  #b-ride { top: 56px; background: rgba(216,32,42,0.5); }
+  #b-air  { top: 108px; background: rgba(60,120,200,0.5); }
+  .touch #b-ride, .touch #b-air { display: flex; }
+
   /* ---------- Overlays ---------- */
   .overlay {
     position: absolute; inset: 0; z-index: 20;
@@ -155,6 +165,8 @@
     <div class="ctlbtn ctl" id="b-weapon">⟳<br>WPN</div>
     <div id="god-btn">GOD</div>
     <div id="pause-btn">❚❚</div>
+    <div id="b-ride">RIDE</div>
+    <div id="b-air">AIR</div>
   </div>
 
   <div id="start-screen" class="overlay">
@@ -165,8 +177,9 @@
       <b>Turn your phone sideways.</b><br>
       <b>◀ ▶</b> move · <b>▲ ▼</b> aim up/down · <b>JUMP</b> · <b>FIRE</b><br>
       <b>Keyboard:</b> <b>←→</b> move · <b>↑</b> jump (double-jump!) · <b>X</b> fire · <b>C</b> melee<br>
-      <b>Shift</b> dash · <b>E</b> bomb · <b>R</b> ultimate · <b>Q</b> weapon · <b>W/S</b> aim · <b>G</b> god · <b>P</b> pause<br>
-      Grab <b>S / F / R</b> pods · clear <b>arenas</b> · spend coins in the <b>shop</b> · 3 levels &amp; bosses!
+      <b>Shift</b> dash · <b>E</b> bomb · <b>R</b> ultimate · <b>F</b> ride vehicle · <b>T</b> air support<br>
+      <b>Q</b> weapon · <b>W/S</b> aim · <b>G</b> god · <b>P</b> pause &nbsp;·&nbsp; ride the <b>bike</b> &amp; <b>flying car</b>!<br>
+      Clear <b>arenas</b> · spend coins in the <b>shop</b> · 3 levels, bosses &amp; mayhem!
     </div>
   </div>
 
