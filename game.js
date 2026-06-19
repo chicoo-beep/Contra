@@ -6,11 +6,13 @@
 (function () {
   "use strict";
 
-  const VW = 480, VH = 270;
+  const VW = 480, VH = 270;          // logical game units (unchanged)
+  const RS = 1.5;                    // render supersample: draw into a 1.5x backing for crisper pixels
   const GROUND_Y = 222;
   const GRAVITY = 0.55;
 
   const canvas = document.getElementById("screen");
+  canvas.width = Math.round(VW * RS); canvas.height = Math.round(VH * RS);
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
 
@@ -31,6 +33,9 @@
     enemy_drone:   { src: "assets/enemy_drone.png",   fw: 32 },
     enemy_charger: { src: "assets/enemy_charger.png",  fw: 52 },
     coin:          { src: "assets/coin.png",          fw: 32 },
+    bike:          { src: "assets/bike.png",   detailed: true },
+    flycar:        { src: "assets/flycar.png", detailed: true },
+    boss:          { src: "assets/boss.png",   detailed: true },
     bg_level1:     { src: "assets/bg_level1.png" },
     bg_level2:     { src: "assets/bg_level2.png" },
     bg_level3:     { src: "assets/bg_level3.png" }
@@ -49,6 +54,18 @@
     dx = Math.round(dx); dy = Math.round(dy);
     if (flip) { ctx.save(); ctx.translate(dx + dw, dy); ctx.scale(-1, 1); ctx.drawImage(im, fi * fw, 0, fw, fh, 0, 0, dw, dh); ctx.restore(); }
     else ctx.drawImage(im, fi * fw, 0, fw, fh, dx, dy, dw, dh);
+    return true;
+  }
+  // Draw a whole high-res sprite into a box, preserving aspect, smooth-downscaled.
+  // anchor: "bottom" aligns base to (cx, by); "center" centers on (cx, by).
+  function drawWhole(key, cx, by, targetH, flip, anchor) {
+    const im = IMG[key]; if (!im || !im._ok || !im.naturalWidth) return false;
+    const aspect = im.naturalWidth / im.naturalHeight, dh = targetH, dw = dh * aspect;
+    const dx = Math.round(cx - dw / 2), dy = Math.round(anchor === "center" ? by - dh / 2 : by - dh);
+    ctx.imageSmoothingEnabled = true;
+    if (flip) { ctx.save(); ctx.translate(dx + dw, dy); ctx.scale(-1, 1); ctx.drawImage(im, 0, 0, dw, dh); ctx.restore(); }
+    else ctx.drawImage(im, dx, dy, dw, dh);
+    ctx.imageSmoothingEnabled = false;
     return true;
   }
 
@@ -873,6 +890,7 @@
   //  Rendering
   // ============================================================
   function draw() {
+    ctx.setTransform(RS, 0, 0, RS, 0, 0);   // 1.5x supersample base transform (logical coords unchanged)
     drawBackdrop();
     const sx = shake ? (Math.random() * 2 - 1) * shake : 0, sy = shake ? (Math.random() * 2 - 1) * shake : 0;
     ctx.save(); ctx.translate(-Math.round(camX) + Math.round(sx), Math.round(sy));
@@ -1076,8 +1094,26 @@
     ctx.fillStyle = "#ffd23f"; ctx.font = "bold 12px monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(pk.kind, pk.x + 8, y + 9);
   }
 
+  function drawVehicleDecor(type, x, y, w, h, f, hp, hpMax, mounted) {
+    if (mounted) {   // rider tucked onto the seat
+      ctx.fillStyle = "#2e7d4f"; ctx.fillRect(x + w / 2 - 3, y - 4, 7, 8);
+      ctx.fillStyle = "#f0c090"; ctx.fillRect(x + w / 2 - 2, y - 9, 5, 5);
+      ctx.fillStyle = "#c0392b"; ctx.fillRect(x + w / 2 - 3, y - 10, 7, 2);
+    } else if (Math.abs((player.x + player.w / 2) - (x + w / 2)) < 60) {
+      ctx.fillStyle = "#ffd23f"; ctx.font = "bold 9px Trebuchet MS, sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(Math.floor(frame / 20) % 2 ? "RIDE (F)" : "▲ RIDE", x + w / 2, y - 14); ctx.textAlign = "left";
+    }
+    if (hpMax) { ctx.fillStyle = "#5fe07a"; for (let i = 0; i < hp; i++) ctx.fillRect(x + 2 + i * 4, y - (mounted ? 14 : 2), 3, 2); }
+  }
   function drawVehicleAt(type, x, y, w, h, f, hp, hpMax, mounted) {
     x = Math.round(x); y = Math.round(y);
+    const key = type === "flycar" ? "flycar" : "bike";
+    if (IMG[key] && IMG[key]._ok) {
+      if (type === "flycar") drawWhole(key, x + w / 2, y + h / 2, h * 1.85, f < 0, "center");
+      else drawWhole(key, x + w / 2, y + h + 3, h * 1.7, f < 0, "bottom");
+      drawVehicleDecor(type, x, y, w, h, f, hp, hpMax, mounted);
+      return;
+    }
     if (type === "bike") {
       // wheels
       ctx.fillStyle = "#15171c"; ctx.beginPath(); ctx.arc(x + 9, y + h - 4, 6, 0, 7); ctx.arc(x + w - 9, y + h - 4, 6, 0, 7); ctx.fill();
@@ -1273,6 +1309,15 @@
   }
 
   function drawBoss() {
+    if (IMG.boss && IMG.boss._ok) {
+      const flip = player.x > boss.x + boss.w;        // art faces left; flip if player is on the right
+      drawWhole("boss", boss.x + boss.w / 2, boss.y + boss.h + 4, boss.h * 1.7, flip, "bottom");
+      if (boss.pulse > 0) {   // hit flash
+        ctx.globalAlpha = boss.pulse / 30; ctx.fillStyle = "#ffffff";
+        ctx.fillRect(boss.x - 30, boss.y - 30, boss.w + 60, boss.h + 40); ctx.globalAlpha = 1;
+      }
+      return;
+    }
     const x = Math.round(boss.x), y = Math.round(boss.y), w = boss.w, h = boss.h, f = player.x < boss.x ? -1 : 1;
     const phase = boss.phase || 1;
     const hull = boss.pulse > 0 ? "#ffd0c0" : (phase === 1 ? "#4a5160" : phase === 2 ? "#5a4250" : "#5a2a2a");
