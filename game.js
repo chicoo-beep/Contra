@@ -116,7 +116,7 @@
     if (e.code === "KeyG") { toggleGod(); return; }
     if (e.code === "KeyQ") { switchWeapon(); return; }
     if (e.code === "KeyE") { e.preventDefault(); throwGrenade(); return; }
-    if (e.code === "KeyR") { e.preventDefault(); tryUlt(); return; }
+    if (e.code === "KeyR") { e.preventDefault(); activateRage(); return; }
     if (e.code === "KeyF") { e.preventDefault(); toggleVehicle(); return; }
     if (e.code === "KeyT") { e.preventDefault(); callAir(); return; }
     const a = keyMap[e.code]; if (!a) return; e.preventDefault();
@@ -377,7 +377,7 @@
   let popups = [], blasts = [], drops = [], grenades = [];
   let vehicleParked = [], airJet = null;
   let bonusHpMax = 0, fireRateMul = 1, dashCdBase = 38;   // persistent shop upgrades
-  let ultCharge = 0, grenadeCD = 0, pendingShop = false;
+  let rage = 0, berserk = 0, smashCD = 0, grenadeCD = 0, pendingShop = false;
   let hiScore = 0;
   try { hiScore = parseInt(localStorage.getItem("contra_hi") || "0", 10) || 0; } catch (e) {}
   function saveHi() { if (score > hiScore) { hiScore = score; try { localStorage.setItem("contra_hi", String(hiScore)); } catch (e) {} } }
@@ -436,7 +436,7 @@
     boss = makeBoss(L.bossHp);
     bullets = []; eBullets = []; particles = []; popups = []; blasts = []; drops = []; meleeFx = null;
     arenas = (L.arenas || []).map((a) => ({ x: a.x, count: a.count, types: a.types, triggered: false, done: false }));
-    arenaActive = false; curArena = null; arenaTimer = 0; grenades = []; grenadeCD = 0; airJet = null;
+    arenaActive = false; curArena = null; arenaTimer = 0; grenades = []; grenadeCD = 0; airJet = null; berserk = 0; smashCD = 0;
     vehicleParked = (L.vehicles || []).map((v) => { const s = vehSize(v[1]); return { type: v[1], x: v[0], y: v[1] === "flycar" ? 150 : GROUND_Y - s.h, w: s.w, h: s.h, hp: v[1] === "bike" ? 6 : 5, hpMax: v[1] === "bike" ? 6 : 5 }; });
     player.x = 40; player.y = GROUND_Y - 30; player.vx = 0; player.vy = 0; player.prone = false;
     player.vehicle = null; player.w = 14; player.h = 30;
@@ -444,7 +444,7 @@
     camX = 0; shootCD = 0; meleeCD = 0; bannerT = 130;
   }
   function resetGame() {
-    bonusHpMax = 0; fireRateMul = 1; dashCdBase = 38; ultCharge = 0; pendingShop = false;
+    bonusHpMax = 0; fireRateMul = 1; dashCdBase = 38; rage = 0; berserk = 0; smashCD = 0; pendingShop = false;
     player = makePlayer();
     score = 0; lives = 10; coinCount = 0; flashT = 0; frame = 0; pendingAdvance = false;
     shake = 0; hitStop = 0; combo = 0; comboTimer = 0;
@@ -503,7 +503,7 @@
     addPopup(e.x + e.w / 2, e.y - 2, combo >= 2 ? "+" + (base * mult) : "+" + base, combo >= 3 ? "#ffd23f" : "#fff", combo >= 4);
     burst(e.x + e.w / 2, e.y + e.h / 2, "#ff8c3f", 18); burst(e.x + e.w / 2, e.y + e.h / 2, "#ffd23f", 8);
     addShake(3); SFX.explode();
-    ultCharge = Math.min(100, ultCharge + 9);
+    if (berserk <= 0) rage = Math.min(100, rage + 8);
     if (Math.random() < 0.12) drops.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, vy: -2, kind: "heart", t: 0 });
   }
   function hurtEnemy(e, dmg) { if (!e.alive) return; e.hp -= dmg; e.flash = 6; if (e.hp <= 0) { e.alive = false; killReward(e); } else SFX.hit(); }
@@ -545,6 +545,7 @@
     addShake(7); SFX.bossHit(); addPopup(arenaLeft + VW / 2, 64, "CLEAR THE AREA!", "#ffd23f", true);
   }
   function doMelee() {
+    if (berserk > 0) { doSmash(false); meleeCD = 8; return; }   // berserk melee = ground-pound
     meleeCD = 15; SFX.melee();
     const p = player, reach = 26;
     const mx = p.facing > 0 ? p.x + p.w : p.x - reach;
@@ -564,14 +565,29 @@
     grenades.push({ x: player.x + player.w / 2, y: player.y + 6, vx: player.facing * 4.4 + player.vx * 0.4, vy: -5.4, fuse: 72 });
     SFX.rocket();
   }
-  function tryUlt() {
-    if (gameState !== "playing" || ultCharge < 100) return;
-    ultCharge = 0; player.invuln = Math.max(player.invuln, 72);
-    addShake(16); hitStop = Math.max(hitStop, 5); flashT = 14; SFX.bossDie();
-    for (let i = 0; i < 5; i++) blasts.push({ x: camX + 60 + i * 90, y: 70 + (i % 2) * 80, r: 8, max: 95, t: 18 });
-    for (const e of enemies) { if (!e.alive) continue; if (e.x > camX - 40 && e.x < camX + VW + 40) { e.kbx = (e.x < camX + VW / 2 ? -1 : 1) * 8; e.vy = -4; hurtEnemy(e, 8); } }
-    if (boss.alive && boss.active) hurtBoss(22);
-    addPopup(camX + VW / 2, 70, "ULTIMATE!", "#ff4060", true);
+  function activateRage() {
+    if (gameState !== "playing" || rage < 100 || berserk > 0 || player.vehicle) return;
+    rage = 0; berserk = 420;                 // ~7 seconds of fury
+    player.invuln = Math.max(player.invuln, 40);
+    addShake(12); flashT = 10; SFX.bossDie();
+    addPopup(player.x + 7, player.y - 6, "BERSERK!", "#7CFC00", true);
+    doSmash(true);                            // open with a shockwave
+  }
+  function doSmash(initial) {
+    if (smashCD > 0 && !initial) return;
+    smashCD = 26;
+    const cx = player.x + player.w / 2, cy = player.y + player.h;
+    blasts.push({ x: cx, y: cy, r: 8, max: 100, t: 20 });
+    burst(cx, cy, "#c7f5a0", 30); burst(cx, cy, "#a0e070", 18); burst(cx, cy, "#dfeecf", 16);
+    addShake(14); hitStop = Math.max(hitStop, 5); SFX.bossDie();
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      if (dist(ecx, cy, cx, cy) < 100 && Math.abs(ecy - cy) < 70) {
+        e.kbx = (ecx < cx ? -1 : 1) * 9; e.vy = -6; e.flash = 8; hurtEnemy(e, 6);
+      }
+    }
+    if (boss.alive && boss.active && dist(boss.x + boss.w / 2, cy, cx, cy) < 130) hurtBoss(14);
   }
   // ---- vehicles (rideable, weaponized) ----
   function toggleVehicle() {
@@ -693,6 +709,7 @@
       return;
     }
     player.hp--; flashT = 8; addShake(7); hitStop = Math.max(hitStop, 2); combo = 0; comboTimer = 0; SFX.hurt(); burst(player.x + 7, player.y + 15, "#ff5050", 20);
+    if (berserk <= 0) rage = Math.min(100, rage + 14);   // taking damage builds rage
     if (player.hp <= 0) {
       lives--;
       if (lives <= 0) { gameState = "over"; saveHi(); SFX.over(); showOverlay("gameover-screen", "over-score", "SCORE " + score + "   BEST " + hiScore); }
@@ -715,12 +732,14 @@
     if (flashT > 0) flashT--;
     if (bannerT > 0) bannerT--;
     if (comboTimer > 0 && --comboTimer === 0) combo = 0;
+    if (smashCD > 0) smashCD--;
+    if (berserk > 0) { berserk--; if (berserk === 0) addPopup(player.x + 7, player.y - 6, "calm…", "#9fd3ff"); }
     const p = player;
     if (p.invuln > 0) p.invuln--;
 
     if (p.vehicle) { updateMounted(p); } else {
-    const ACC = 1.0, MAXV = 3.6, FRICT = 0.78;
-    p.prone = input.down && p.onGround && !(input.left || input.right);
+    const ACC = berserk > 0 ? 1.5 : 1.0, MAXV = berserk > 0 ? 4.8 : 3.6, FRICT = 0.78;
+    p.prone = input.down && p.onGround && !(input.left || input.right) && berserk <= 0;
     if (input.left && p.dashTimer <= 0) { p.vx -= ACC; if (!mouse.active) p.facing = -1; }
     if (input.right && p.dashTimer <= 0) { p.vx += ACC; if (!mouse.active) p.facing = 1; }
     if (!input.left && !input.right && p.dashTimer <= 0) p.vx *= FRICT;
@@ -821,7 +840,10 @@
         e.chargeT++; const dir = p.x > e.x ? 1 : -1;
         e.x += dir * ((e.chargeT % 90 < 50) ? 0.7 : 2.7);   // bursts of fast charging
       }
-      if (overlap(p, e)) playerHit();
+      if (overlap(p, e)) {
+        if (berserk > 0) { e.kbx = (e.x < p.x ? -1 : 1) * 7; e.vy = -3; e.flash = 6; hurtEnemy(e, 2); }
+        else playerHit();
+      }
     }
 
     if (boss.alive) {
@@ -1171,10 +1193,20 @@
     else if (!p.onGround) key = p.vy < 0 ? "player_jump" : "player_fall";
     else if (Math.abs(p.vx) > 0.4) { key = "player_run"; spd = 3; }
     else key = "player_idle";
-    const dw = 38, dh = 38;
+    const big = berserk > 0;
+    if (big) {   // green rage aura
+      const cx = p.x + p.w / 2, cy = p.y + p.h / 2, ar = 26 + Math.sin(frame * 0.3) * 3;
+      const ag = ctx.createRadialGradient(cx, cy, 4, cx, cy, ar);
+      ag.addColorStop(0, "rgba(124,252,0,0.35)"); ag.addColorStop(1, "rgba(124,252,0,0)");
+      ctx.fillStyle = ag; ctx.beginPath(); ctx.arc(cx, cy, ar, 0, 7); ctx.fill();
+    }
+    const dw = big ? 50 : 38, dh = big ? 50 : 38;
     const dx = p.x + p.w / 2 - dw / 2;
     const dy = p.y + p.h - dh + 5 + (p.prone ? 9 : 0);
-    if (drawSprite(key, frame / spd, dx, dy, dw, dh, p.facing < 0)) { drawGunOverlay(); return; }
+    if (big) ctx.filter = "hue-rotate(75deg) saturate(1.6) brightness(1.1)";
+    const drew = drawSprite(key, frame / spd, dx, dy, dw, dh, p.facing < 0);
+    if (big) ctx.filter = "none";
+    if (drew) { if (!big) drawGunOverlay(); return; }
     drawPlayerShapes();
   }
 
@@ -1374,14 +1406,20 @@
     ctx.fillStyle = "#9bd35a"; ctx.font = "bold 10px Trebuchet MS, sans-serif";
     ctx.fillText("✦x" + (player ? player.grenades : 0), 184, 24);
     ctx.fillStyle = "#9fd3ff"; ctx.fillText("✈x" + (player ? player.airstrikes : 0), 210, 24);
-    // ultimate charge bar
+    // rage / berserk bar
     const ux = 230, uw = 86;
     ctx.fillStyle = "#0c1320"; ctx.fillRect(ux - 1, 6, uw + 2, 8);
-    const ready = ultCharge >= 100;
-    ctx.fillStyle = ready ? (Math.floor(frame / 6) % 2 ? "#ff4060" : "#ffd23f") : "#7a3fd0";
-    ctx.fillRect(ux, 7, uw * (ultCharge / 100), 6);
+    if (berserk > 0) {
+      ctx.fillStyle = Math.floor(frame / 5) % 2 ? "#7CFC00" : "#b6ff66";
+      ctx.fillRect(ux, 7, uw * (berserk / 420), 6);
+      ctx.fillStyle = "#0a200a"; ctx.font = "bold 8px monospace"; ctx.textAlign = "center"; ctx.fillText("BERSERK", ux + uw / 2, 13); ctx.textAlign = "left";
+    } else {
+      const ready = rage >= 100;
+      ctx.fillStyle = ready ? (Math.floor(frame / 6) % 2 ? "#7CFC00" : "#ffd23f") : "#c0392b";
+      ctx.fillRect(ux, 7, uw * (rage / 100), 6);
+      ctx.fillStyle = "#fff"; ctx.font = "bold 8px monospace"; ctx.textAlign = "center"; ctx.fillText(ready ? "RAGE! (R)" : "RAGE", ux + uw / 2, 13); ctx.textAlign = "left";
+    }
     ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1; ctx.strokeRect(ux + 0.5, 6.5, uw, 7);
-    ctx.fillStyle = "#fff"; ctx.font = "bold 8px monospace"; ctx.textAlign = "center"; ctx.fillText(ready ? "ULT READY (R)" : "ULT", ux + uw / 2, 13); ctx.textAlign = "left";
     const coinX = VW - 92;
     ctx.fillStyle = "#caa31a"; ctx.beginPath(); ctx.arc(coinX, 15, 8, 0, 7); ctx.fill();
     ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(coinX, 15, 6, 0, 7); ctx.fill();
@@ -1442,7 +1480,7 @@
   document.getElementById("shop-continue").addEventListener("click", continueShop);
   document.querySelectorAll("#shop-screen .shop-item").forEach((el, i) => bindTap(el, () => buyItem(i)));
   bindTap(document.getElementById("b-grenade"), throwGrenade);
-  bindTap(document.getElementById("b-ult"), tryUlt);
+  bindTap(document.getElementById("b-ult"), activateRage);
   bindTap(document.getElementById("b-ride"), toggleVehicle);
   bindTap(document.getElementById("b-air"), callAir);
 

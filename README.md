@@ -40,7 +40,7 @@ Or just open `index.html` directly in a browser.
 | Melee hit | HIT button | `C` |
 | Dash (i-frames) | — | `Shift` |
 | Grenade | BOMB button | `E` |
-| Ultimate (when charged) | ULT button | `R` |
+| Rage / Berserk (when charged) | RAGE button | `R` |
 | Ride / exit vehicle | RIDE button | `F` (stand on a bike/car) |
 | Air support | AIR button | `T` |
 | Switch weapon | ⟳ WPN | `Q` |
@@ -64,7 +64,9 @@ diagonally down.
   weapons carry over between levels.
 - **PC controls:** keyboard-first (jump on `↑`), plus a **dash** (Shift) with
   i-frames and a **double-jump**. Mouse free-aim is optional.
-- **Grenades** (`E`) and a charge-up **Ultimate** (`R`) that clears the screen.
+- **Grenades** (`E`) and a **Rage / Berserk** mode (`R`): fill the rage meter by
+  dealing and taking damage, then unleash ~7s of fury — bigger, faster, ramming
+  enemies on contact, with your melee turned into a **ground-pound shockwave**.
 - **Coin shop between levels** — spend coins on Max Health, Faster Fire, Faster
   Dash, or extra Lives.
 - **Rideable weaponized vehicles** (press `F` near one): an original red sci-fi
