@@ -26,6 +26,7 @@
     player_run:    { src: "assets/player_run.png",    fw: 32 },
     player_jump:   { src: "assets/player_jump.png",   fw: 32 },
     player_fall:   { src: "assets/player_fall.png",   fw: 32 },
+    player_face:   { src: "assets/player_face.png" },   // optional: your photo, drawn on the hero's head
     enemy_soldier: { src: "assets/enemy_soldier.png", fw: 32 },
     enemy_heavy:   { src: "assets/enemy_heavy.png",   fw: 36 },
     enemy_jumper:  { src: "assets/enemy_jumper.png",  fw: 32 },
@@ -1206,8 +1207,30 @@
     if (big) ctx.filter = "hue-rotate(75deg) saturate(1.6) brightness(1.1)";
     const drew = drawSprite(key, frame / spd, dx, dy, dw, dh, p.facing < 0);
     if (big) ctx.filter = "none";
-    if (drew) { if (!big) drawGunOverlay(); return; }
+    if (drew) {
+      drawFace(dx + dw / 2, dy + dh * 0.30, dw * 0.20);
+      if (!big) drawGunOverlay();
+      return;
+    }
     drawPlayerShapes();
+    drawFace(p.x + p.w / 2, p.y + (big ? 2 : 4), big ? 10 : 7);
+  }
+  // optional: paste the player's own photo (assets/player_face.png) onto the head, circle-cropped
+  function drawFace(cx, cy, r) {
+    const im = IMG.player_face;
+    if (!im || !im._ok || !im.naturalWidth) return;
+    const bob = Math.sin(frame * 0.18) * 0.6;   // tiny life so it doesn't feel pasted-on
+    cy += bob;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.closePath(); ctx.clip();
+    const iw = im.naturalWidth, ih = im.naturalHeight, s = Math.max((2 * r) / iw, (2 * r) / ih);
+    const w = iw * s, h = ih * s;
+    if (berserk > 0) ctx.filter = "hue-rotate(75deg) saturate(1.6) brightness(1.1)";
+    ctx.drawImage(im, cx - w / 2, cy - h / 2, w, h);
+    ctx.filter = "none";
+    ctx.restore();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = berserk > 0 ? "#7CFC00" : "rgba(20,24,32,0.55)";
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke();
   }
 
   // small code-drawn gun barrel + muzzle so aim/shooting reads on the sprite
