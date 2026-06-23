@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+dist-ssr/
+
+# local env files — NEVER commit your real API key
+.env
+.env.local
+.env.*.local
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.log
+npm-debug.log*
