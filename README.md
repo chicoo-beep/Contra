@@ -58,20 +58,6 @@ npm run build     # production build → dist/
 npm run preview   # preview the production build locally
 ```
 
-## Deploying (optional)
-
-A GitHub Actions workflow (`.github/workflows/deploy.yml`) can publish the
-static UI to GitHub Pages. Before it can succeed you must enable Pages:
-
-> **Settings → Pages → Source: "GitHub Actions"**
-
-It then runs on pushes to `main` (or via "Run workflow"). The site is served at
-`https://<user>.github.io/Contra/` — `vite.config.js` sets `base` accordingly.
-
-Remember: the deployed build has **no API key**, so the live site can spin the
-wheel but cannot generate recipes. Live generation only works locally with your
-own `.env`. If you don't want Pages at all, just delete the workflow file.
-
 ## Model
 
 The model is a single constant in [`src/api/recipeGenerator.js`](src/api/recipeGenerator.js):
@@ -91,7 +77,6 @@ by changing just that line.
 ├── index.html
 ├── vite.config.js
 ├── .env.example
-├── .github/workflows/deploy.yml   # optional CI → GitHub Pages
 └── src/
     ├── main.jsx                   # entry; injects global CSS
     ├── App.jsx                    # tabs + favorites state (localStorage)
