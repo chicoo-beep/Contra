@@ -1,16 +1,22 @@
-# Builds the Vite app and deploys it to GitHub Pages on every push to the
-# feature branch. Optional — enable Pages in repo Settings → Pages → "GitHub
-# Actions" for it to publish.
+# Builds the Vite app and deploys it to GitHub Pages.
 #
-# ⚠️  This build does NOT include your API key (see README security note). A
-# deployed static build cannot safely hold a Claude key; the live recipe
-# generation only works locally with your own .env. The deploy is here to
-# demonstrate the CI → Pages workflow.
+# ⚠️  PREREQUISITE: enable Pages first — repo Settings → Pages → Source:
+# "GitHub Actions". Until then this workflow fails at the deploy step with a
+# 404 (no Pages site to deploy to).
+#
+# Triggers on pushes to `main` and manual dispatch only (not feature branches),
+# so it deploys deliberately from the merged state rather than failing on every
+# work-in-progress push.
+#
+# ⚠️  The deployed build does NOT include an API key (VITE_ vars would be public
+# — see README). So the live site is a UI shell: spinning works, but recipe
+# generation only works locally with your own .env. This workflow exists to
+# demonstrate the CI → Pages loop.
 name: Deploy
 
 on:
   push:
-    branches: ["claude/app-project-ideas-5es0e5", "main"]
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
